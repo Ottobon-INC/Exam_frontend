@@ -1,0 +1,27 @@
+﻿@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-zinc-50 text-zinc-900 antialiased;
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-white/70 backdrop-blur-xl border border-white/40 shadow-xl;
+  }
+  .glass-card-dark {
+    @apply bg-zinc-900/80 backdrop-blur-xl border border-zinc-700/50 shadow-2xl;
+  }
+  .gradient-bg-1 {
+    @apply bg-gradient-to-br from-emerald-900 via-zinc-900 to-zinc-950;
+  }
+  .gradient-bg-2 {
+    @apply bg-gradient-to-br from-zinc-50 via-zinc-100 to-emerald-50;
+  }
+  .btn-primary {
+    @apply bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl shadow-lg shadow-emerald-600/30 transition-all duration-300;
+  }
+}
