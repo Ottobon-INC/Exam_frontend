@@ -15,6 +15,9 @@ export default defineConfig({
     }),
     vue(),
   ],
+  server: {
+    port: 5050,
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src')
