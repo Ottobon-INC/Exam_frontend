@@ -19,3 +19,4 @@ services:
     # which will connect to the backend over the public internet (port 4000).
     env_file:
       - .env
+    network_mode: bridge
