@@ -105,7 +105,7 @@
               <button
                 v-if="!exam.bookedSlot"
                 @click="openSlotBookingModal(exam)"
-                class="w-full rounded-lg bg-indigo-600 py-2.5 text-xs font-bold text-white hover:bg-indigo-700 transition-colors shadow-sm cursor-pointer"
+                class="w-full rounded-lg bg-zinc-900 py-2.5 text-xs font-bold text-white hover:bg-zinc-800 transition-colors shadow-sm cursor-pointer"
               >
                 ⏰ Select Exam Time Slot
               </button>
@@ -131,10 +131,10 @@
               <!-- Case 4: Slot Expired -->
               <button
                 v-else
-                disabled
-                class="w-full rounded-lg bg-red-100 py-2.5 text-xs font-bold text-red-700 cursor-not-allowed"
+                @click="openSlotBookingModal(exam)"
+                class="w-full rounded-lg bg-red-100 py-2.5 text-xs font-bold text-red-700 hover:bg-red-200 transition-colors shadow-sm cursor-pointer"
               >
-                🔴 Time Slot Expired
+                🔴 Slot Expired - Re-Book Now
               </button>
             </div>
           </div>
@@ -210,12 +210,12 @@
             </div>
 
             <button
-              @click="confirmBookSlot(s.id)"
-              :disabled="s.remainingSeats <= 0 || bookingInProgress"
-              class="rounded-lg bg-zinc-900 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-zinc-800 disabled:opacity-40 cursor-pointer shadow-sm"
-            >
-              {{ s.remainingSeats <= 0 ? 'Full' : 'Book Seat' }}
-            </button>
+                @click="confirmBookSlot(s.id)"
+                :disabled="s.remainingSeats <= 0 || bookingInProgress || isSlotExpired(s)"
+                class="rounded-lg bg-zinc-900 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-zinc-800 disabled:opacity-40 cursor-pointer shadow-sm"
+              >
+                {{ isSlotExpired(s) ? 'Expired' : (s.remainingSeats <= 0 ? 'Full' : 'Book Seat') }}
+              </button>
           </div>
         </div>
       </div>
@@ -251,11 +251,20 @@ const fetchDashboardData = async () => {
       user.value = profileRes.user
       localStorage.setItem('candidate_user', JSON.stringify(profileRes.user))
     }
+    
+    const localCompleted = JSON.parse(localStorage.getItem(`completed_exams_${user.value?.id}`) || '[]')
 
     const examsRes = await slotService.getCandidateAssignedExams()
     if (examsRes?.exams) {
-      availableExams.value = examsRes.exams.filter((e) => e.status === 'LIVE' || e.status === 'SCHEDULED')
-      completedExams.value = examsRes.exams.filter((e) => e.status === 'COMPLETED' || e.publishedResults)
+      availableExams.value = examsRes.exams.filter((e) => {
+        if (localCompleted.includes(e.id)) return false
+        return e.status === 'LIVE' || e.status === 'SCHEDULED'
+      })
+      
+      completedExams.value = examsRes.exams.filter((e) => {
+        if (localCompleted.includes(e.id)) return true
+        return e.status === 'COMPLETED' || e.publishedResults
+      })
     }
   } catch (err) {
     console.error('Failed to load candidate dashboard data:', err)
@@ -299,7 +308,8 @@ const confirmBookSlot = async (slotId) => {
 
 const isSlotActive = (exam) => {
   if (!exam || !exam.bookedSlot) return false
-  if (exam.status === 'LIVE') return true
+  if (exam.status !== 'LIVE') return false
+  
   const now = new Date()
   const start = new Date(exam.bookedSlot.startTime)
   const end = new Date(exam.bookedSlot.endTime)
@@ -311,6 +321,13 @@ const isSlotUpcoming = (slot) => {
   const now = new Date()
   const start = new Date(slot.startTime)
   return now < start
+}
+
+const isSlotExpired = (slot) => {
+  if (!slot) return false
+  const now = new Date()
+  const start = new Date(slot.startTime)
+  return now > start
 }
 
 const getExamStatusBadge = (exam) => {

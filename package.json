@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "autoprefixer": "^10.5.4",
-    "frappe-ui": "^0.1.278",
+    "frappe-ui": "^0.1.132",
     "postcss": "^8.5.26",
     "vue": "^3.5.41",
     "vue-router": "^4.4.0"

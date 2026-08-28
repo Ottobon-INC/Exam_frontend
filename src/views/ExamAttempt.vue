@@ -26,6 +26,10 @@ const user = ref(JSON.parse(localStorage.getItem('candidate_user') || '{}'))
 const isFullScreen = ref(true)
 const isTerminated = ref(false)
 const terminationReason = ref('')
+const violationWarnings = ref(0)
+const showWarningModal = ref(false)
+const warningMessage = ref('')
+const showSubmitConfirmModal = ref(false)
 
 
 let timerInterval = null
@@ -85,31 +89,60 @@ const requestFullScreen = async () => {
   }
 }
 
+const triggerAntiCheatViolation = async (eventType, baseDetails) => {
+  if (isTerminated.value || loading.value || !attemptId.value) return
+  
+  violationWarnings.value++
+  if (attemptId.value) {
+    localStorage.setItem(`exam_warnings_${attemptId.value}`, violationWarnings.value.toString())
+  }
+  
+  if (socket && attemptId.value) {
+    socket.emit('log_violation', {
+      examId: route.params.id,
+      attemptId: attemptId.value,
+      candidateId: user.value.id,
+      eventType: eventType,
+      severity: 'HIGH',
+      details: `${baseDetails} (Warning ${violationWarnings.value} of 3)`,
+    })
+  }
+
+  if (violationWarnings.value > 3) {
+    isTerminated.value = true
+    terminationReason.value = `Security Violation: Multiple unauthorized navigations away from exam (Exceeded 3 warnings).`
+    
+    // Immediately submit to backend to prevent refresh exploits
+    try {
+      await attemptService.submitAttempt(attemptId.value)
+      markExamAsCompletedLocally()
+    } catch (err) {
+      console.error('Error auto-submitting on final violation:', err)
+    }
+
+    // Delay the redirect so they can read the termination message
+    setTimeout(() => {
+      router.push(`/results/${route.params.id}`)
+    }, 5000)
+    
+  } else {
+    warningMessage.value = `Warning ${violationWarnings.value} of 3: Navigating away from the exam interface is strictly prohibited. Further violations will result in automatic exam termination.`
+    showWarningModal.value = true
+  }
+}
+
 const handleFullScreenChange = async () => {
   const isFS = Boolean(document.fullscreenElement || document.webkitFullscreenElement)
   isFullScreen.value = isFS
 
   if (!isFS && !isTerminated.value && attemptId.value && !loading.value) {
-    isTerminated.value = true
-    terminationReason.value = 'Security Violation: Candidate exited Full-Screen mode during active exam.'
-
-    if (socket && attemptId.value) {
-      socket.emit('log_violation', {
-        examId: route.params.id,
-        attemptId: attemptId.value,
-        candidateId: user.value.id,
-        eventType: 'FULLSCREEN_EXIT',
-        severity: 'HIGH',
-        details: 'Candidate exited Full-Screen mode (press ESC / window change). Exam auto-terminated.',
-      })
-    }
-
-    try {
-      await attemptService.submitAttempt(attemptId.value)
-    } catch (err) {
-      console.error('Error auto-submitting on fullscreen exit:', err)
-    }
+    await triggerAntiCheatViolation('FULLSCREEN_EXIT', 'Candidate exited Full-Screen mode')
   }
+}
+
+const acknowledgeWarning = async () => {
+  showWarningModal.value = false
+  await requestFullScreen()
 }
 
 const switchSection = (idx) => {
@@ -124,6 +157,20 @@ onMounted(async () => {
 
     attemptId.value = res.attemptId
     exam.value = res.exam
+    
+    // Restore warnings from localStorage
+    violationWarnings.value = parseInt(localStorage.getItem(`exam_warnings_${res.attemptId}`) || '0')
+    
+    // If they already exceeded warnings in a previous session, terminate immediately
+    if (violationWarnings.value > 3) {
+      isTerminated.value = true
+      terminationReason.value = `Security Violation: Multiple unauthorized navigations away from exam (Exceeded 3 warnings).`
+      setTimeout(() => {
+        router.push(`/results/${route.params.id}`)
+      }, 3000)
+      return
+    }
+
     sections.value = res.exam.sections || []
     unsectionedQuestions.value = res.exam.unsectionedQuestions || []
     timeLeft.value = (res.exam.durationMinutes || 60) * 60
@@ -229,16 +276,9 @@ onUnmounted(() => {
   if (stream.value) stream.value.getTracks().forEach((t) => t.stop())
 })
 
-const handleVisibilityChange = () => {
-  if (document.hidden && socket && attemptId.value) {
-    socket.emit('log_violation', {
-      examId: route.params.id,
-      attemptId: attemptId.value,
-      candidateId: user.value.id,
-      eventType: 'TAB_SWITCH',
-      severity: 'HIGH',
-      details: 'Candidate navigated away from exam tab',
-    })
+const handleVisibilityChange = async () => {
+  if (document.hidden && !isTerminated.value && attemptId.value && !loading.value) {
+    await triggerAntiCheatViolation('TAB_SWITCH', 'Candidate navigated away from exam tab')
   }
 }
 
@@ -264,14 +304,29 @@ const formatTime = (seconds) => {
   return h > 0 ? `${h}:${m}:${s}` : `${m}:${s}`
 }
 
+const markExamAsCompletedLocally = () => {
+  const storedCompleted = JSON.parse(localStorage.getItem(`completed_exams_${user.value.id}`) || '[]')
+  if (!storedCompleted.includes(route.params.id)) {
+    storedCompleted.push(route.params.id)
+    localStorage.setItem(`completed_exams_${user.value.id}`, JSON.stringify(storedCompleted))
+  }
+}
+
+const executeSubmit = async () => {
+  try {
+    await attemptService.submitAttempt(attemptId.value)
+    markExamAsCompletedLocally()
+    router.push(`/results/${route.params.id}`)
+  } catch (err) {
+    alert(err.message || 'Error submitting exam.')
+  }
+}
+
 const submitExam = async (isAuto = false) => {
-  if (isAuto || confirm('Are you sure you want to submit your examination?')) {
-    try {
-      await attemptService.submitAttempt(attemptId.value)
-      router.push(`/results/${route.params.id}`)
-    } catch (err) {
-      alert(err.message || 'Error submitting exam.')
-    }
+  if (isAuto) {
+    await executeSubmit()
+  } else {
+    showSubmitConfirmModal.value = true
   }
 }
 </script>
@@ -493,4 +548,60 @@ const submitExam = async (isAuto = false) => {
       </div>
     </div>
   </div>
+
+  <!-- Anti-Cheat Warning Modal -->
+  <Teleport to="body">
+    <div v-if="isTerminated" class="fixed inset-0 z-[10000] flex flex-col items-center justify-center bg-zinc-950 p-6 text-center">
+      <div class="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-red-900/30 text-red-500 mb-6">
+        <svg class="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+        </svg>
+      </div>
+      <h2 class="text-2xl font-black text-white uppercase tracking-wider">Exam Terminated</h2>
+      <p class="mt-4 max-w-md text-sm font-medium text-red-400">{{ terminationReason }}</p>
+      <p class="mt-6 text-xs text-zinc-500">Your exam has been automatically submitted. You are being redirected...</p>
+    </div>
+
+    <!-- Submit Confirmation Modal -->
+    <div v-else-if="showSubmitConfirmModal" class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
+      <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl text-center space-y-5">
+        <h3 class="text-xl font-black text-zinc-900">Submit Examination?</h3>
+        <p class="text-sm font-medium text-zinc-600">Are you sure you want to submit your examination? You will not be able to change your answers.</p>
+        <div class="flex items-center gap-3 mt-4">
+          <button
+            @click="showSubmitConfirmModal = false"
+            class="flex-1 rounded-xl bg-zinc-200 py-3 text-xs font-bold text-zinc-700 hover:bg-zinc-300 transition-colors cursor-pointer"
+          >
+            Cancel
+          </button>
+          <button
+            @click="executeSubmit"
+            class="flex-1 rounded-xl bg-emerald-600 py-3 text-xs font-bold text-white hover:bg-emerald-700 transition-colors cursor-pointer"
+          >
+            Yes, Submit Exam
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Warning Modal -->
+    <div v-else-if="showWarningModal" class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
+      <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl text-center space-y-5">
+        <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-red-100">
+          <span class="text-3xl">⚠️</span>
+        </div>
+        <div>
+          <h3 class="text-lg font-black text-red-700 uppercase tracking-wide">Security Warning</h3>
+          <p class="mt-2 text-sm font-bold text-zinc-800">{{ warningMessage }}</p>
+          <p class="mt-2 text-xs text-zinc-500">Please remain in full-screen mode and do not switch tabs.</p>
+        </div>
+        <button
+          @click="acknowledgeWarning"
+          class="w-full rounded-xl bg-red-600 py-3 text-xs font-bold text-white hover:bg-red-700 transition-colors cursor-pointer"
+        >
+          I Understand & Resume Exam
+        </button>
+      </div>
+    </div>
+  </Teleport>
 </template>

@@ -1216,7 +1216,8 @@
     <!-- ============================================================================= -->
     <!-- EXAM CREATION WIZARD (6-STEP GUIDED DRAWER)                                   -->
     <!-- ============================================================================= -->
-    <div v-if="showWizard" class="fixed inset-0 z-50 flex">
+    <Teleport to="body">
+      <div v-if="showWizard" class="fixed inset-0 z-[100] flex">
       <!-- Backdrop -->
       <div class="flex-1 bg-black/50 backdrop-blur-sm" @click="closeWizardSafe"></div>
 
@@ -1508,11 +1509,21 @@
                   <h5 class="text-xs font-bold text-zinc-900">📋 Assign Students via CSV</h5>
                   <p class="text-3xs text-zinc-500">CSV format: name, email, phone, password (optional). Temporary passwords are generated automatically if left blank.</p>
                   <div class="flex items-center gap-3 flex-wrap">
-                    <label class="rounded-lg bg-zinc-900 px-4 py-2 text-xs font-bold text-white hover:bg-zinc-800 cursor-pointer shadow-xs">
-                      📤 Upload Roster
-                      <input type="file" accept=".csv" class="hidden" @change="wizardHandleStudentCsv" />
+                    <label
+                      class="rounded-lg px-4 py-2 text-xs font-bold text-white cursor-pointer shadow-xs transition-colors"
+                      :class="wizardSavingStudents ? 'bg-zinc-600 cursor-not-allowed' : 'bg-zinc-900 hover:bg-zinc-800'"
+                    >
+                      <span v-if="wizardSavingStudents" class="flex items-center gap-2">
+                        <span class="relative flex h-2.5 w-2.5">
+                          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                          <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-white"></span>
+                        </span>
+                        Uploading...
+                      </span>
+                      <span v-else>📤 Upload Roster</span>
+                      <input type="file" accept=".csv" class="hidden" @change="wizardHandleStudentCsv" :disabled="wizardSavingStudents" />
                     </label>
-                    <button @click="downloadStudentCsvTemplate()" class="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-xs font-bold text-zinc-700 hover:bg-zinc-100 cursor-pointer shadow-2xs">⬇ Template</button>
+                    <button @click="downloadStudentCsvTemplate()" class="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-xs font-bold text-zinc-700 hover:bg-zinc-100 cursor-pointer shadow-2xs" :disabled="wizardSavingStudents">⬇ Template</button>
                     <button
                       v-if="wizardAssignedCredentials.length > 0"
                       @click="exportWizardCredentialsCsv"
@@ -1693,7 +1704,8 @@
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -1762,6 +1774,10 @@ const generateAutoSlots = async () => {
   generatingAutoSlots.value = true
   let count = 0
   let currentStart = new Date(start)
+  if (currentStart.getMinutes() > 0 || currentStart.getSeconds() > 0) {
+    currentStart.setHours(currentStart.getHours() + 1)
+    currentStart.setMinutes(0, 0, 0, 0)
+  }
 
   try {
     while (currentStart.getTime() + durationMs <= end.getTime()) {
@@ -1973,6 +1989,7 @@ const showWizard = ref(false)
 const wizardStep = ref(1)
 const wizardExamId = ref(null)   // Set after exam is created in DB at step 1
 const wizardSaving = ref(false)
+const wizardSavingStudents = ref(false)
 const wizardUploadedQuestions = ref(0)
 const wizardStudentCount = ref(0)
 const wizardSlotCount = ref(0)
@@ -2126,6 +2143,7 @@ const resetWizard = () => {
   wizardStep.value = 1
   wizardExamId.value = null
   wizardSaving.value = false
+  wizardSavingStudents.value = false
   wizardUploadedQuestions.value = 0
   wizardStudentCount.value = 0
   wizardSlotCount.value = 0
@@ -2432,6 +2450,9 @@ const exportWizardCredentialsCsv = () => {
 const wizardHandleStudentCsv = async (event) => {
   const file = event.target.files[0]
   if (!file || !wizardExamId.value) return
+  
+  wizardSavingStudents.value = true
+  
   const reader = new FileReader()
   reader.onload = async (e) => {
     try {
@@ -2509,6 +2530,8 @@ const wizardHandleStudentCsv = async (event) => {
       alert(`⚡ Successfully assigned ${students.length} students! Total assigned roster: ${wizardAssignedCredentials.value.length} candidates.`)
     } catch (err) {
       alert(err.message || 'Failed to assign students.')
+    } finally {
+      wizardSavingStudents.value = false
     }
   }
   reader.readAsText(file)
@@ -2527,6 +2550,10 @@ const wizardGenerateSlots = async () => {
   wizardSaving.value = true
   let count = 0
   let cur = new Date(start)
+  if (cur.getMinutes() > 0 || cur.getSeconds() > 0) {
+    cur.setHours(cur.getHours() + 1)
+    cur.setMinutes(0, 0, 0, 0)
+  }
   try {
     while (cur.getTime() + durationMs <= end.getTime()) {
       const slotEnd = new Date(cur.getTime() + durationMs)
