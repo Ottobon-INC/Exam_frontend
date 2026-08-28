@@ -25,6 +25,15 @@ export const examService = {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
+  deleteExam: (id) =>
+    request(`/exams/${id}`, {
+      method: 'DELETE',
+    }),
+  togglePublishResults: (examId, publish) =>
+    request(`/results/${examId}/publish`, {
+      method: 'POST',
+      body: JSON.stringify({ publish }),
+    }),
 }
 
 export const sectionService = {
@@ -76,6 +85,11 @@ export const questionService = {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
+  batchUpdateMarks: (examId, sectionId, points, negativePoints) =>
+    request('/questions/batch-marks', {
+      method: 'POST',
+      body: JSON.stringify({ examId, sectionId, points, negativePoints }),
+    }),
   deleteQuestion: (id) =>
     request(`/questions/${id}`, {
       method: 'DELETE',
@@ -97,6 +111,13 @@ export const attemptService = {
     request('/attempts/submit', {
       method: 'POST',
       body: JSON.stringify({ attemptId }),
+    }),
+  getLeaderboard: (examId) => request(`/exams/${examId}/leaderboard`),
+  getAttemptDetails: (attemptId) => request(`/attempts/${attemptId}/details`),
+  sendScoreEmail: (attemptId, data = {}) =>
+    request(`/attempts/${attemptId}/send-email`, {
+      method: 'POST',
+      body: JSON.stringify(data),
     }),
 }
 

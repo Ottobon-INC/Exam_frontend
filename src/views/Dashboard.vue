@@ -110,9 +110,9 @@
                 ⏰ Select Exam Time Slot
               </button>
 
-              <!-- Case 2: Slot Booked - Active Window Open -->
+              <!-- Case 2: Slot Booked - Active Window Open or Exam LIVE -->
               <button
-                v-else-if="isSlotActive(exam.bookedSlot)"
+                v-else-if="isSlotActive(exam)"
                 @click="startExam(exam.id)"
                 class="w-full rounded-lg bg-emerald-600 py-2.5 text-xs font-bold text-white hover:bg-emerald-700 transition-colors shadow-sm cursor-pointer"
               >
@@ -125,7 +125,7 @@
                 disabled
                 class="w-full rounded-lg bg-zinc-200 py-2.5 text-xs font-bold text-zinc-500 cursor-not-allowed"
               >
-                🔒 Slot Opens at {{ new Date(exam.bookedSlot.startTime).toLocaleTimeString() }}
+                🔒 Slot Opens at {{ new Date(exam.bookedSlot.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }}
               </button>
 
               <!-- Case 4: Slot Expired -->
@@ -297,11 +297,12 @@ const confirmBookSlot = async (slotId) => {
   }
 }
 
-const isSlotActive = (slot) => {
-  if (!slot) return true
+const isSlotActive = (exam) => {
+  if (!exam || !exam.bookedSlot) return false
+  if (exam.status === 'LIVE') return true
   const now = new Date()
-  const start = new Date(slot.startTime)
-  const end = new Date(slot.endTime)
+  const start = new Date(exam.bookedSlot.startTime)
+  const end = new Date(exam.bookedSlot.endTime)
   return now >= start && now <= end
 }
 
@@ -314,14 +315,14 @@ const isSlotUpcoming = (slot) => {
 
 const getExamStatusBadge = (exam) => {
   if (!exam.bookedSlot) return 'Slot Pending'
-  if (isSlotActive(exam.bookedSlot)) return 'Slot Active'
+  if (isSlotActive(exam)) return 'Slot Active'
   if (isSlotUpcoming(exam.bookedSlot)) return 'Slot Scheduled'
   return 'Slot Expired'
 }
 
 const getExamStatusClass = (exam) => {
   if (!exam.bookedSlot) return 'bg-amber-100 text-amber-800'
-  if (isSlotActive(exam.bookedSlot)) return 'bg-emerald-100 text-emerald-800'
+  if (isSlotActive(exam)) return 'bg-emerald-100 text-emerald-800'
   if (isSlotUpcoming(exam.bookedSlot)) return 'bg-blue-100 text-blue-800'
   return 'bg-red-100 text-red-700'
 }

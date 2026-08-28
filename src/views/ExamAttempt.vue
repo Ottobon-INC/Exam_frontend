@@ -1,4 +1,4 @@
-﻿<script setup>
+<script setup>
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Button } from 'frappe-ui'
@@ -369,7 +369,7 @@ const submitExam = async (isAuto = false) => {
                 :key="idx"
                 class="flex cursor-pointer items-center gap-3 rounded-xl border p-4 text-xs font-medium transition-all"
                 :class="[
-                  String(answers[currentQuestion.id]) === String(idx)
+                  String(answers[currentQuestion.id]) === String(option) || String(answers[currentQuestion.id]) === String(idx)
                     ? 'border-ink-gray-9 bg-surface-gray-2 text-ink-gray-9 font-semibold'
                     : 'border-outline-gray-1 bg-surface-white text-ink-gray-8 hover:bg-surface-gray-1 hover:border-outline-gray-2'
                 ]"
@@ -377,9 +377,9 @@ const submitExam = async (isAuto = false) => {
                 <input
                   type="radio"
                   :name="`q-${currentQuestion.id}`"
-                  :value="idx"
-                  :checked="String(answers[currentQuestion.id]) === String(idx)"
-                  @change="handleAnswerChange(currentQuestion.id, idx)"
+                  :value="option"
+                  :checked="String(answers[currentQuestion.id]) === String(option) || String(answers[currentQuestion.id]) === String(idx)"
+                  @change="handleAnswerChange(currentQuestion.id, option)"
                   class="h-4 w-4 border-outline-gray-3 text-ink-gray-9 focus:ring-0"
                 />
                 <span>{{ option }}</span>
