@@ -217,7 +217,7 @@ import { examService } from '../../api/services'
 import { initProctorSocket } from '../../api/socket'
 
 const liveExams = ref([])
-const selectedExamId = ref('')
+const selectedExamId = ref('ALL')
 const candidates = ref([])
 const selectedCandidate = ref(null)
 const loading = ref(true)
@@ -227,14 +227,16 @@ let socket = null
 const loadExams = async () => {
   loading.value = true
   try {
-    const res = await examService.getExams('LIVE')
-    liveExams.value = res.exams || []
-    if (liveExams.value.length > 0) {
-      selectedExamId.value = liveExams.value[0].id
-      connectProctorRoom(selectedExamId.value)
-    }
+    const res = await examService.getExams()
+    const rawExams = res.exams || []
+    liveExams.value = [
+      { id: 'ALL', code: 'ALL', title: 'All Active Examinations' },
+      ...rawExams,
+    ]
+    selectedExamId.value = 'ALL'
+    connectProctorRoom('ALL')
   } catch (err) {
-    console.error('Failed to load live exams:', err)
+    console.error('Failed to load exams:', err)
   } finally {
     loading.value = false
   }
@@ -247,12 +249,20 @@ const connectProctorRoom = (examId) => {
     role: 'PROCTOR',
   })
 
+  // Remove existing listeners to avoid duplicate bindings
+  socket.off('candidate_online')
+  socket.off('proctor_frame_stream')
+  socket.off('proctor_feed_update')
+  socket.off('violation_alert')
+
   // Listen for new candidate joining
   socket.on('candidate_online', (data) => {
+    if (selectedExamId.value !== 'ALL' && data.examId && String(data.examId) !== String(selectedExamId.value)) return
     const existing = candidates.value.find((c) => c.id === data.candidateId)
     if (!existing) {
       candidates.value.push({
         id: data.candidateId,
+        examId: data.examId,
         name: data.candidateName || 'Candidate',
         rollNumber: data.rollNumber,
         status: 'Active',
@@ -265,11 +275,13 @@ const connectProctorRoom = (examId) => {
 
   // Listen for live snapshot photo stream
   socket.on('proctor_frame_stream', (data) => {
+    if (selectedExamId.value !== 'ALL' && data.examId && String(data.examId) !== String(selectedExamId.value)) return
     const formattedTime = new Date().toLocaleTimeString()
     let c = candidates.value.find((item) => item.id === data.candidateId)
     if (!c) {
       c = {
         id: data.candidateId,
+        examId: data.examId,
         name: data.candidateName || 'Candidate',
         rollNumber: data.rollNumber,
         status: 'Active',
@@ -284,6 +296,7 @@ const connectProctorRoom = (examId) => {
       c.lastSnapshotTime = formattedTime
       if (data.candidateName) c.name = data.candidateName
       if (data.rollNumber) c.rollNumber = data.rollNumber
+      if (data.examId) c.examId = data.examId
     }
 
     if (selectedCandidate.value && selectedCandidate.value.id === data.candidateId) {
@@ -294,6 +307,7 @@ const connectProctorRoom = (examId) => {
 
   // Listen for telemetry updates
   socket.on('proctor_feed_update', (data) => {
+    if (selectedExamId.value !== 'ALL' && data.examId && String(data.examId) !== String(selectedExamId.value)) return
     const c = candidates.value.find((item) => item.id === data.candidateId)
     if (c) {
       c.fps = data.fps || 24
@@ -303,10 +317,12 @@ const connectProctorRoom = (examId) => {
 
   // Listen for violation alerts
   socket.on('violation_alert', (data) => {
+    if (selectedExamId.value !== 'ALL' && data.examId && String(data.examId) !== String(selectedExamId.value)) return
     let c = candidates.value.find((item) => item.id === data.candidateId)
     if (!c) {
       c = {
         id: data.candidateId,
+        examId: data.examId,
         name: 'Candidate',
         violations: 0,
         auditLogs: [],

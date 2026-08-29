@@ -365,7 +365,7 @@ onMounted(async () => {
 
     captureAndSendSnapshot = () => {
       const v = videoRef.value
-      if (v && socket) {
+      if (v && v.readyState >= 2 && v.videoWidth > 0 && socket) {
         try {
           ctx.drawImage(v, 0, 0, canvas.width, canvas.height)
           const photoData = canvas.toDataURL('image/jpeg', 0.8)

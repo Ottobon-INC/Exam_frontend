@@ -181,11 +181,11 @@
               </div>
               
               <!-- MCQ Option Choice -->
-              <div v-else-if="ans.selectedOption !== null && ans.selectedOption !== undefined" class="flex items-center gap-2">
+              <div v-else-if="ans.selectedOption !== null && ans.selectedOption !== undefined" class="flex items-center gap-2 flex-wrap">
                 <span class="rounded bg-surface-white border border-outline-gray-2 px-2 py-0.5 font-bold text-ink-gray-9">
-                  Option {{ String.fromCharCode(65 + Number(ans.selectedOption)) }}
+                  {{ formatOptionChoice(ans.selectedOption, ans.question?.options).label }}
                 </span>
-                <span class="text-ink-gray-8">{{ ans.question?.options?.[Number(ans.selectedOption)] || 'Candidate selected choice' }}</span>
+                <span class="text-ink-gray-8">{{ formatOptionChoice(ans.selectedOption, ans.question?.options).text }}</span>
               </div>
 
               <div v-else class="text-ink-gray-4 italic text-2xs">
@@ -267,6 +267,39 @@ const loadEvaluations = async () => {
 onMounted(() => {
   loadEvaluations()
 })
+
+const formatOptionChoice = (selectedOption, options = []) => {
+  if (selectedOption === null || selectedOption === undefined) return { label: '', text: '' }
+  const str = String(selectedOption).trim()
+  if (!str) return { label: '', text: '' }
+
+  // 1. Single letter ("A", "B", "C", "D")
+  if (str.length === 1 && str.toUpperCase() >= 'A' && str.toUpperCase() <= 'Z') {
+    const letter = str.toUpperCase()
+    const idx = letter.charCodeAt(0) - 65
+    const text = (Array.isArray(options) && options[idx]) ? options[idx] : str
+    return { label: `Option ${letter}`, text }
+  }
+
+  // 2. Index number ("0", "1", "2", "3")
+  if (!isNaN(str) && Number(str) >= 0 && Number(str) < 26 && String(Number(str)) === str) {
+    const idx = Number(str)
+    const letter = String.fromCharCode(65 + idx)
+    const text = (Array.isArray(options) && options[idx]) ? options[idx] : str
+    return { label: `Option ${letter}`, text }
+  }
+
+  // 3. Full option text (e.g. "Keystone: 5 hrs...")
+  if (Array.isArray(options) && options.length > 0) {
+    const matchIdx = options.findIndex(opt => String(opt).trim().toLowerCase() === str.toLowerCase())
+    if (matchIdx >= 0) {
+      const letter = String.fromCharCode(65 + matchIdx)
+      return { label: `Option ${letter}`, text: options[matchIdx] }
+    }
+  }
+
+  return { label: 'Selected Answer', text: str }
+}
 
 const selectCandidate = (att) => {
   selectedAttempt.value = att
