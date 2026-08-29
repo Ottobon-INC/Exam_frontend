@@ -1,12 +1,12 @@
-﻿<script setup>
+<script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { FormControl, Button } from 'frappe-ui'
 import { authService } from '../api/services'
 
 const router = useRouter()
-const email = ref('candidate@enterprise.org')
-const password = ref('password123')
+const email = ref('')
+const password = ref('')
 const loading = ref(false)
 const errorMessage = ref('')
 
@@ -43,22 +43,32 @@ const handleLogin = async () => {
         {{ errorMessage }}
       </div>
 
-      <form class="space-y-4" @submit.prevent="handleLogin">
-        <FormControl
-          v-model="email"
-          type="email"
-          label="Candidate Email"
-          placeholder="candidate@enterprise.org"
-          required
-        />
+      <form class="space-y-4" @submit.prevent="handleLogin" autocomplete="off">
+        <div>
+          <label class="mb-1.5 block text-xs font-medium text-zinc-700">Candidate Email <span class="text-red-500">*</span></label>
+          <input
+            v-model="email"
+            type="email"
+            name="candidate_email_field"
+            autocomplete="off"
+            required
+            class="w-full rounded-lg border border-zinc-300 bg-zinc-50 px-3.5 py-2 text-xs text-zinc-900 transition-colors focus:border-emerald-600 focus:bg-white focus:outline-none"
+            placeholder=""
+          />
+        </div>
         
-        <FormControl
-          v-model="password"
-          type="password"
-          label="Password"
-          placeholder="••••••••"
-          required
-        />
+        <div>
+          <label class="mb-1.5 block text-xs font-medium text-zinc-700">Password <span class="text-red-500">*</span></label>
+          <input
+            v-model="password"
+            type="password"
+            name="candidate_password_field"
+            autocomplete="new-password"
+            required
+            class="w-full rounded-lg border border-zinc-300 bg-zinc-50 px-3.5 py-2 text-xs text-zinc-900 transition-colors focus:border-emerald-600 focus:bg-white focus:outline-none"
+            placeholder=""
+          />
+        </div>
 
         <div class="pt-2">
           <button
@@ -72,14 +82,6 @@ const handleLogin = async () => {
         </div>
       </form>
 
-      <div class="mt-6 border-t border-outline-gray-1 pt-4 text-center">
-        <router-link
-          to="/admin/login"
-          class="inline-flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-900 transition-colors"
-        >
-          <span>Examiner & Admin Sign In →</span>
-        </router-link>
-      </div>
     </div>
   </div>
 </template>

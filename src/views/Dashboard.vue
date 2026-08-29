@@ -156,7 +156,18 @@
               <div class="mt-0.5 flex items-center gap-2 text-2xs text-zinc-500">
                 <span>Code: {{ exam.code }}</span>
                 <span>•</span>
-                <span class="font-bold text-emerald-700">Results Published</span>
+                <span 
+                  v-if="exam.publishedResults || exam.userAttempt?.status === 'EVALUATED'" 
+                  class="font-bold text-emerald-700"
+                >
+                  Results Published
+                </span>
+                <span 
+                  v-else 
+                  class="font-bold text-amber-600"
+                >
+                  Under Evaluation
+                </span>
               </div>
             </div>
             <div>
@@ -164,7 +175,7 @@
                 @click="router.push(`/results/${exam.id}`)"
                 class="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-xs font-bold text-zinc-800 hover:bg-zinc-100 cursor-pointer"
               >
-                View Score Report
+                {{ (exam.publishedResults || exam.userAttempt?.status === 'EVALUATED') ? 'View Score Report' : 'Check Status' }}
               </button>
             </div>
           </div>
@@ -257,13 +268,13 @@ const fetchDashboardData = async () => {
     const examsRes = await slotService.getCandidateAssignedExams()
     if (examsRes?.exams) {
       availableExams.value = examsRes.exams.filter((e) => {
-        if (localCompleted.includes(e.id)) return false
+        if (e.userAttempt || localCompleted.includes(e.id)) return false
         return e.status === 'LIVE' || e.status === 'SCHEDULED'
       })
       
       completedExams.value = examsRes.exams.filter((e) => {
-        if (localCompleted.includes(e.id)) return true
-        return e.status === 'COMPLETED' || e.publishedResults
+        if (e.userAttempt || localCompleted.includes(e.id)) return true
+        return e.status === 'COMPLETED'
       })
     }
   } catch (err) {

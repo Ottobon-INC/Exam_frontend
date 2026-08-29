@@ -17,41 +17,17 @@
         {{ errorMessage }}
       </div>
 
-      <!-- Quick Role Switcher Demo Pills (Only for Login) -->
-      <div v-if="!isRegistering" class="mb-6">
-        <label class="mb-2 block text-3xs font-medium text-zinc-400 uppercase tracking-wider">Quick Demo Credentials:</label>
-        <div class="grid grid-cols-2 gap-2">
-          <button
-            v-for="role in demoRoles"
-            :key="role.id"
-            @click="selectRole(role)"
-            type="button"
-            class="flex items-center gap-2 rounded-lg border p-2 text-left transition-all text-xs"
-            :class="[
-              selectedRole.id === role.id
-                ? 'border-ink-gray-9 bg-surface-gray-2 text-white font-semibold'
-                : 'border-zinc-700 bg-zinc-800/50 text-zinc-300 hover:border-zinc-600 hover:bg-zinc-800'
-            ]"
-          >
-            <span class="h-2 w-2 rounded-full" :class="role.color"></span>
-            <div class="flex flex-col truncate">
-              <span class="truncate">{{ role.name }}</span>
-              <span class="text-3xs text-ink-gray-4">{{ role.description }}</span>
-            </div>
-          </button>
-        </div>
-      </div>
-
       <!-- Login / Register Form -->
-      <form @submit.prevent="handleSubmit" class="space-y-4">
+      <form @submit.prevent="handleSubmit" class="space-y-4" autocomplete="off">
         <div v-if="isRegistering">
           <label class="mb-1.5 block text-xs font-medium text-zinc-300">Full Name</label>
           <input
             v-model="name"
             type="text"
+            autocomplete="off"
             required
-            class="w-full rounded-lg border border-outline-gray-2 bg-surface-white px-3 py-2 text-xs text-zinc-900 placeholder-ink-gray-4 transition-colors focus:border-outline-gray-5 focus:outline-none"
-            placeholder="Jane Doe"
+            class="w-full rounded-lg border border-outline-gray-2 bg-surface-white px-3 py-2 text-xs text-zinc-900 transition-colors focus:border-outline-gray-5 focus:outline-none"
+            placeholder=""
           />
         </div>
 
@@ -60,9 +36,11 @@
           <input
             v-model="email"
             type="email"
+            name="admin_email_field"
+            autocomplete="off"
             required
-            class="w-full rounded-lg border border-outline-gray-2 bg-surface-white px-3 py-2 text-xs text-zinc-900 placeholder-ink-gray-4 transition-colors focus:border-outline-gray-5 focus:outline-none"
-            placeholder="admin@enterprise.org"
+            class="w-full rounded-lg border border-outline-gray-2 bg-surface-white px-3 py-2 text-xs text-zinc-900 transition-colors focus:border-outline-gray-5 focus:outline-none"
+            placeholder=""
           />
         </div>
 
@@ -71,9 +49,11 @@
           <input
             v-model="password"
             type="password"
+            name="admin_password_field"
+            autocomplete="new-password"
             required
-            class="w-full rounded-lg border border-outline-gray-2 bg-surface-white px-3 py-2 text-xs text-zinc-900 placeholder-ink-gray-4 transition-colors focus:border-outline-gray-5 focus:outline-none"
-            placeholder="••••••••"
+            class="w-full rounded-lg border border-outline-gray-2 bg-surface-white px-3 py-2 text-xs text-zinc-900 transition-colors focus:border-outline-gray-5 focus:outline-none"
+            placeholder=""
           />
         </div>
 
@@ -96,7 +76,7 @@
           class="flex w-full items-center justify-center gap-2 rounded-lg btn-primary py-2.5 mt-2"
         >
           <span v-if="loading">{{ isRegistering ? 'Registering...' : 'Authenticating...' }}</span>
-          <span v-else>{{ isRegistering ? 'Create Account' : `Sign In as ${selectedRole.name}` }}</span>
+          <span v-else>{{ isRegistering ? 'Create Account' : 'Sign In' }}</span>
         </button>
       </form>
 
@@ -138,8 +118,8 @@ const demoRoles = [
 ]
 
 const selectedRole = ref(demoRoles[0])
-const email = ref(demoRoles[0].email)
-const password = ref('password123')
+const email = ref('')
+const password = ref('')
 
 // Fields specific to registration
 const name = ref('')
@@ -151,13 +131,8 @@ const errorMessage = ref('')
 const toggleMode = () => {
   isRegistering.value = !isRegistering.value
   errorMessage.value = ''
-  if (!isRegistering.value) {
-    email.value = selectedRole.value.email
-    password.value = 'password123'
-  } else {
-    email.value = ''
-    password.value = ''
-  }
+  email.value = ''
+  password.value = ''
 }
 
 const selectRole = (role) => {
