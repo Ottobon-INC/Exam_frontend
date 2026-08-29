@@ -55,8 +55,36 @@ const requestPermissions = async () => {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
     if (stream) {
-      cameraGranted.value = true
+      const video = document.createElement('video')
+      video.muted = true
+      video.playsInline = true
+      video.srcObject = stream
+      await video.play().catch(() => {})
+
+      await new Promise((resolve) => setTimeout(resolve, 600))
+
+      const canvas = document.createElement('canvas')
+      canvas.width = 64
+      canvas.height = 64
+      const ctx = canvas.getContext('2d')
+      ctx.drawImage(video, 0, 0, 64, 64)
+      const pixels = ctx.getImageData(0, 0, 64, 64).data
+
+      let totalLum = 0
+      for (let i = 0; i < pixels.length; i += 4) {
+        totalLum += 0.299 * pixels[i] + 0.587 * pixels[i + 1] + 0.114 * pixels[i + 2]
+      }
+      const avgLum = totalLum / (pixels.length / 4)
+
       stream.getTracks().forEach((track) => track.stop())
+
+      if (avgLum < 12) {
+        alert('⚠️ Camera feed is covered, taped over, or pitch black. Please uncover your webcam lens and face the camera to proceed.')
+        cameraGranted.value = false
+        return
+      }
+
+      cameraGranted.value = true
     }
   } catch (err) {
     alert('Camera & Microphone permission is required to proceed with this proctored examination.')

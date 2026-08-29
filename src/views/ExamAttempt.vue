@@ -33,6 +33,7 @@ const showSubmitConfirmModal = ref(false)
 
 
 let timerInterval = null
+let faceCheckInterval = null
 let socket = null
 let autoSaveTimeout = null
 let captureAndSendSnapshot = () => {}
@@ -150,6 +151,36 @@ const switchSection = (idx) => {
   currentQuestionIndex.value = 0
 }
 
+const isFirstQuestion = computed(() => {
+  return activeSectionIdx.value === 0 && currentQuestionIndex.value === 0
+})
+
+const isLastQuestion = computed(() => {
+  if (!allSectionTabs.value.length) return true
+  const lastSectionIdx = allSectionTabs.value.length - 1
+  const lastSecQuestions = allSectionTabs.value[lastSectionIdx]?.questions || []
+  return activeSectionIdx.value === lastSectionIdx && currentQuestionIndex.value === lastSecQuestions.length - 1
+})
+
+const handleNext = () => {
+  if (currentQuestionIndex.value < currentSectionQuestions.value.length - 1) {
+    currentQuestionIndex.value++
+  } else if (activeSectionIdx.value < allSectionTabs.value.length - 1) {
+    activeSectionIdx.value++
+    currentQuestionIndex.value = 0
+  }
+}
+
+const handlePrev = () => {
+  if (currentQuestionIndex.value > 0) {
+    currentQuestionIndex.value--
+  } else if (activeSectionIdx.value > 0) {
+    activeSectionIdx.value--
+    const prevSecQuestions = allSectionTabs.value[activeSectionIdx.value]?.questions || []
+    currentQuestionIndex.value = Math.max(0, prevSecQuestions.length - 1)
+  }
+}
+
 onMounted(async () => {
   try {
     const examId = route.params.id
@@ -221,6 +252,95 @@ onMounted(async () => {
     canvas.height = 480
     const ctx = canvas.getContext('2d')
 
+    let faceMissingStreak = 0
+
+    const inspectFaceAndCameraStream = () => {
+      if (isTerminated.value || loading.value) return
+      const v = videoRef.value
+
+      let isObstructed = false
+      let failReason = ''
+
+      // 1. Check Stream & Track State
+      if (!stream.value || !stream.value.active) {
+        isObstructed = true
+        failReason = 'Webcam video stream is inactive or disconnected.'
+      } else {
+        const vTracks = stream.value.getVideoTracks()
+        if (!vTracks.length || !vTracks[0].enabled || vTracks[0].readyState !== 'live' || vTracks[0].muted) {
+          isObstructed = true
+          failReason = 'Webcam video track is disabled, muted, or blocked.'
+        }
+      }
+
+      // 2. Pixel Luminance & Contrast Check
+      if (!isObstructed && v && v.readyState >= 2 && v.videoWidth > 0) {
+        try {
+          ctx.drawImage(v, 0, 0, 64, 64)
+          const framePixels = ctx.getImageData(0, 0, 64, 64).data
+          let totalLum = 0
+          let maxLum = 0
+          let minLum = 255
+          const totalCount = framePixels.length / 4
+
+          for (let i = 0; i < framePixels.length; i += 4) {
+            const r = framePixels[i]
+            const g = framePixels[i + 1]
+            const b = framePixels[i + 2]
+            const lum = 0.299 * r + 0.587 * g + 0.114 * b
+            totalLum += lum
+            if (lum > maxLum) maxLum = lum
+            if (lum < minLum) minLum = lum
+          }
+
+          const avgLum = totalLum / totalCount
+          const contrastRange = maxLum - minLum
+
+          if (avgLum < 12 || contrastRange < 8) {
+            isObstructed = true
+            failReason = 'Webcam feed is pitch black or lens is covered/taped over. Face not detected.'
+          }
+        } catch (e) {
+          console.warn('[Face Inspector] Frame analysis error:', e)
+        }
+      }
+
+      // Handle violations
+      if (isObstructed) {
+        faceMissingStreak++
+        console.warn(`[STRICT PROCTOR] Violation Streak ${faceMissingStreak}/3 — ${failReason}`)
+
+        if (socket) {
+          socket.emit('candidate_violation', {
+            examId: targetExamId,
+            candidateId: user.value.id,
+            candidateName: user.value.name,
+            rollNumber: user.value.rollNumber,
+            eventType: 'FACE_NOT_VISIBLE',
+            severity: faceMissingStreak >= 3 ? 'CRITICAL' : 'HIGH',
+            details: failReason,
+          })
+        }
+
+        if (faceMissingStreak === 1) {
+          alert(`⚠️ PROCTOR WARNING: ${failReason} Please face the camera clearly.`)
+        } else if (faceMissingStreak === 2) {
+          warningMessage.value = `⚠️ CRITICAL PROCTOR ALERT: ${failReason}\n\nPlease unveil your camera and align your face in the center of the screen IMMEDIATELY or your exam will be TERMINATED!`
+          showWarningModal.value = true
+        } else if (faceMissingStreak >= 3) {
+          terminationReason.value = `⛔ EXAM TERMINATED: ${failReason} (Repeated camera obstruction / Face missing for over 8 seconds)`
+          submitExam(true)
+        }
+      } else {
+        if (faceMissingStreak > 0) {
+          faceMissingStreak = 0
+          if (showWarningModal.value && warningMessage.value.includes('pitch black')) {
+            showWarningModal.value = false
+          }
+        }
+      }
+    }
+
     captureAndSendSnapshot = () => {
       const v = videoRef.value
       if (v && socket) {
@@ -239,6 +359,7 @@ onMounted(async () => {
           console.warn('[Proctoring] Snapshot error:', e)
         }
       }
+      inspectFaceAndCameraStream()
     }
 
     if (videoRef.value) {
@@ -246,9 +367,9 @@ onMounted(async () => {
     }
     setTimeout(captureAndSendSnapshot, 1000)
     setTimeout(captureAndSendSnapshot, 3000)
-    setInterval(captureAndSendSnapshot, 30000)
+    faceCheckInterval = setInterval(captureAndSendSnapshot, 2500)
 
-        document.addEventListener('visibilitychange', handleVisibilityChange)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
     document.addEventListener('fullscreenchange', handleFullScreenChange)
     document.addEventListener('webkitfullscreenchange', handleFullScreenChange)
     requestFullScreen()
@@ -270,7 +391,8 @@ onMounted(async () => {
 
 onUnmounted(() => {
   clearInterval(timerInterval)
-    document.removeEventListener('visibilitychange', handleVisibilityChange)
+  if (faceCheckInterval) clearInterval(faceCheckInterval)
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
   document.removeEventListener('fullscreenchange', handleFullScreenChange)
   document.removeEventListener('webkitfullscreenchange', handleFullScreenChange)
   if (stream.value) stream.value.getTracks().forEach((t) => t.stop())
@@ -463,15 +585,15 @@ const submitExam = async (isAuto = false) => {
                 <Button
                   variant="subtle"
                   label="← Previous"
-                  :disabled="currentQuestionIndex === 0"
-                  @click="currentQuestionIndex--"
+                  :disabled="isFirstQuestion"
+                  @click="handlePrev"
                 />
                 <Button
                   variant="solid"
                   theme="gray"
                   label="Next →"
-                  :disabled="currentQuestionIndex === currentSectionQuestions.length - 1"
-                  @click="currentQuestionIndex++"
+                  :disabled="isLastQuestion"
+                  @click="handleNext"
                 />
               </div>
             </div>

@@ -494,8 +494,12 @@
                 <button @click="showAutoSlotForm = false" type="button" class="rounded-xl border border-zinc-300 bg-white px-4 py-2 text-xs font-bold text-zinc-700 hover:bg-zinc-100 cursor-pointer shadow-2xs">
                   Cancel
                 </button>
-                <button @click="generateAutoSlots" :disabled="generatingAutoSlots" type="button" class="rounded-xl bg-zinc-900 px-5 py-2 text-xs font-bold text-white hover:bg-zinc-800 disabled:opacity-50 cursor-pointer shadow-sm transition-all">
-                  {{ generatingAutoSlots ? 'Generating...' : `⚡ Generate ${examForm.durationMinutes || 60}-Min Slots` }}
+                <button @click="generateAutoSlots" :disabled="generatingAutoSlots" type="button" class="rounded-xl bg-zinc-900 px-5 py-2 text-xs font-bold text-white hover:bg-zinc-800 disabled:opacity-50 cursor-pointer shadow-sm transition-all inline-flex items-center gap-2">
+                  <svg v-if="generatingAutoSlots" class="animate-spin h-3.5 w-3.5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <span>{{ generatingAutoSlots ? 'Generating...' : `⚡ Generate ${examForm.durationMinutes || 60}-Min Slots` }}</span>
                 </button>
               </div>
             </div>
@@ -1045,7 +1049,17 @@
               Self-paced submissions auto-ranked by Highest Score & Fastest Time. Results are hidden from candidates until examiner email dispatch.
             </p>
           </div>
-          <button @click="showLeaderboardModal = false" class="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-800 transition-colors cursor-pointer">✕</button>
+          <div class="flex items-center gap-3">
+            <button
+              @click="downloadItemizedCsv"
+              type="button"
+              class="flex items-center gap-1.5 rounded-xl bg-emerald-700 px-3.5 py-2 text-2xs font-bold text-white hover:bg-emerald-800 transition-colors shadow-2xs cursor-pointer shrink-0"
+            >
+              <span>📥</span>
+              <span>Export Itemized CSV Report</span>
+            </button>
+            <button @click="showLeaderboardModal = false" class="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-800 transition-colors cursor-pointer">✕</button>
+          </div>
         </div>
 
         <!-- Summary Metrics Cards -->
@@ -1584,8 +1598,12 @@
                       <input v-model.number="wSlotForm.capacity" type="number" min="1" placeholder="30" class="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-xs text-zinc-900 focus:border-zinc-600 focus:outline-none" />
                     </div>
                   </div>
-                  <button @click="wizardGenerateSlots" :disabled="!wSlotForm.windowStart || !wSlotForm.windowEnd" class="rounded-lg bg-zinc-900 px-4 py-2 text-xs font-bold text-white hover:bg-zinc-800 disabled:opacity-40 cursor-pointer">
-                    ⚡ Auto-Generate Slots
+                  <button @click="wizardGenerateSlots" :disabled="!wSlotForm.windowStart || !wSlotForm.windowEnd || wizardSaving" class="rounded-lg bg-zinc-900 px-4 py-2 text-xs font-bold text-white hover:bg-zinc-800 disabled:opacity-40 cursor-pointer inline-flex items-center gap-2 transition-all">
+                    <svg v-if="wizardSaving" class="animate-spin h-3.5 w-3.5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>{{ wizardSaving ? 'Generating Slots...' : '⚡ Auto-Generate Slots' }}</span>
                   </button>
                   <div v-if="wizardSlotCount > 0" class="text-xs font-bold text-emerald-700">✅ {{ wizardSlotCount }} slot(s) created</div>
                 </div>
@@ -1650,6 +1668,25 @@
                     <div>{{ wForm.shuffleQuestions ? '✅ Shuffled Questions' : '○ Fixed Question Order' }}</div>
                     <div>{{ wForm.showImmediateResults ? '✅ Instant Results' : '○ Results Hidden Until Published' }}</div>
                   </div>
+                </div>
+
+                <!-- Email Invitation Toggle Card -->
+                <div class="rounded-xl border border-indigo-200 bg-indigo-50/50 p-4 flex items-center justify-between gap-3">
+                  <div class="flex items-center gap-3">
+                    <input id="send-emails-check" v-model="wizardSendEmails" type="checkbox" class="h-4 w-4 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer" />
+                    <label for="send-emails-check" class="text-xs font-bold text-indigo-900 cursor-pointer select-none">
+                      📧 Automatically email credentials & slot booking link to registered candidates on launch
+                    </label>
+                  </div>
+                  <button
+                    v-if="wizardStudentCount > 0"
+                    @click="dispatchWizardEmails"
+                    :disabled="dispatchingEmails"
+                    type="button"
+                    class="rounded-lg bg-indigo-600 px-3.5 py-1.5 text-2xs font-bold text-white hover:bg-indigo-700 cursor-pointer disabled:opacity-50 transition-colors shadow-2xs shrink-0"
+                  >
+                    {{ dispatchingEmails ? 'Sending Emails...' : 'Send Mails Now' }}
+                  </button>
                 </div>
 
                 <!-- Launch Options -->
@@ -1780,19 +1817,24 @@ const generateAutoSlots = async () => {
   }
 
   try {
+    const slotsToCreate = []
     while (currentStart.getTime() + durationMs <= end.getTime()) {
       const currentEnd = new Date(currentStart.getTime() + durationMs)
-      
-      const payload = {
+      slotsToCreate.push({
         startTime: currentStart.toISOString().slice(0, 16),
         endTime: currentEnd.toISOString().slice(0, 16),
         capacity: autoSlotConfig.value.capacity || 30,
-      }
-
-      await slotService.createSlot(activeExam.value.id, payload)
-      count++
+      })
       currentStart = currentEnd
     }
+
+    if (slotsToCreate.length === 0) {
+      alert(`No complete ${examForm.value.durationMinutes || 60}-minute slots fit in that window. Try expanding your start/end window.`)
+      return
+    }
+
+    const res = await slotService.bulkCreateSlots(activeExam.value.id, slotsToCreate)
+    count = res.count || slotsToCreate.length
 
     alert(`⚡ Successfully auto-generated ${count} slots of ${examForm.value.durationMinutes} minutes each!`)
     showAutoSlotForm.value = false
@@ -1892,19 +1934,23 @@ const savingQuestionEdit = ref(false)
 // Leaderboard & Response Inspector State
 const showLeaderboardModal = ref(false)
 const leaderboardExamTitle = ref('')
+const leaderboardExamId = ref(null)
 const leaderboardRows = ref([])
 const leaderboardMetrics = ref({})
 const loadingLeaderboard = ref(false)
 
-const selectedAttemptDetails = ref(null)
-const loadingAttemptDetails = ref(false)
-const sendingEmailAttemptId = ref(null)
+const downloadItemizedCsv = () => {
+  if (!leaderboardExamId.value) return
+  const token = localStorage.getItem('admin_token') || localStorage.getItem('token') || ''
+  window.open(`${examService.exportItemizedResultsUrl(leaderboardExamId.value)}?token=${token}`, '_blank')
+}
 
 const openLeaderboardModal = async (exam) => {
   if (!exam || !exam.id) {
     alert('Invalid exam selected.')
     return
   }
+  leaderboardExamId.value = exam.id
   leaderboardExamTitle.value = exam.title || 'Exam Leaderboard'
   showLeaderboardModal.value = true
   loadingLeaderboard.value = true
@@ -2311,6 +2357,128 @@ const wizardAddSection = async () => {
   }
 }
 
+// RFC 4180 compliant CSV parser that respects quoted strings containing commas
+const parseCsvText = (text) => {
+  const rows = []
+  let currentRow = []
+  let field = ''
+  let inQuotes = false
+
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i]
+    const nextChar = text[i + 1]
+
+    if (inQuotes) {
+      if (char === '"') {
+        if (nextChar === '"') {
+          field += '"'
+          i++
+        } else {
+          inQuotes = false
+        }
+      } else {
+        field += char
+      }
+    } else {
+      if (char === '"') {
+        inQuotes = true
+      } else if (char === ',' || char === ';' || char === '\t') {
+        currentRow.push(field.trim())
+        field = ''
+      } else if (char === '\r') {
+        if (nextChar === '\n') i++
+        currentRow.push(field.trim())
+        if (currentRow.some((c) => c.length > 0)) rows.push(currentRow)
+        currentRow = []
+        field = ''
+      } else if (char === '\n') {
+        currentRow.push(field.trim())
+        if (currentRow.some((c) => c.length > 0)) rows.push(currentRow)
+        currentRow = []
+        field = ''
+      } else {
+        field += char
+      }
+    }
+  }
+
+  if (field || currentRow.length > 0) {
+    currentRow.push(field.trim())
+    if (currentRow.some((c) => c.length > 0)) rows.push(currentRow)
+  }
+
+  return rows
+}
+
+/**
+ * Precise CSV header column index finder.
+ * Correctly identifies option_a, option_b, option_c, option_d, statement, correct_answer, etc.
+ * Avoids substring matching bugs (e.g. 'a' in 'statement').
+ */
+const findColumnIndex = (headers, targetType) => {
+  const normHeaders = headers.map(h => String(h || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '_'))
+
+  if (targetType === 'statement') {
+    const idx = normHeaders.findIndex(h => h.includes('statement') || h.includes('question') || h === 'q' || h === 'stmt')
+    return idx >= 0 ? idx : (normHeaders[0] === 'index' || normHeaders[0] === 'id' ? 1 : 0)
+  }
+  if (targetType === 'opt1') {
+    const idx = normHeaders.findIndex(h => ['option_a', 'optiona', 'opt_a', 'opta', 'option_1', 'option1', 'opt_1', 'opt1', 'a', '1'].includes(h))
+    return idx >= 0 ? idx : 2
+  }
+  if (targetType === 'opt2') {
+    const idx = normHeaders.findIndex(h => ['option_b', 'optionb', 'opt_b', 'optb', 'option_2', 'option2', 'opt_2', 'opt2', 'b', '2'].includes(h))
+    return idx >= 0 ? idx : 3
+  }
+  if (targetType === 'opt3') {
+    const idx = normHeaders.findIndex(h => ['option_c', 'optionc', 'opt_c', 'optc', 'option_3', 'option3', 'opt_3', 'opt3', 'c', '3'].includes(h))
+    return idx >= 0 ? idx : 4
+  }
+  if (targetType === 'opt4') {
+    const idx = normHeaders.findIndex(h => ['option_d', 'optiond', 'opt_d', 'optd', 'option_4', 'option4', 'opt_4', 'opt4', 'd', '4'].includes(h))
+    return idx >= 0 ? idx : 5
+  }
+  if (targetType === 'type') {
+    return normHeaders.findIndex(h => h.includes('type') || h === 'kind')
+  }
+  if (targetType === 'correct') {
+    const idx = normHeaders.findIndex(h => h.includes('correct') || h.includes('answer') || h === 'ans' || h === 'key')
+    return idx >= 0 ? idx : 6
+  }
+  if (targetType === 'points') {
+    const idx = normHeaders.findIndex(h => h.includes('points') || h.includes('marks') || h === 'pts' || h === 'score')
+    return idx >= 0 ? idx : 7
+  }
+  if (targetType === 'negative') {
+    const idx = normHeaders.findIndex(h => h.includes('negative') || h.includes('neg') || h.includes('penalty'))
+    return idx >= 0 ? idx : 8
+  }
+  if (targetType === 'difficulty') {
+    const idx = normHeaders.findIndex(h => h.includes('diff') || h.includes('difficulty') || h.includes('level'))
+    return idx >= 0 ? idx : 9
+  }
+  if (targetType === 'topic') {
+    return normHeaders.findIndex(h => h.includes('topic') || h.includes('subject') || h.includes('category') || h.includes('tag'))
+  }
+  return -1
+}
+
+/**
+ * Resolves letter keys ('A', 'B', 'C', 'D') or numeric keys ('1', '2', '3', '4') into actual option text.
+ */
+const resolveCorrectAnswerKey = (rawAns, options) => {
+  if (!rawAns && rawAns !== 0) return options[0] || ''
+  const trimmed = String(rawAns).trim()
+  const upper = trimmed.toUpperCase()
+
+  if (['A', 'OPTION_A', 'OPTION A', '1'].includes(upper)) return options[0] || trimmed
+  if (['B', 'OPTION_B', 'OPTION B', '2'].includes(upper)) return options[1] || trimmed
+  if (['C', 'OPTION_C', 'OPTION C', '3'].includes(upper)) return options[2] || trimmed
+  if (['D', 'OPTION_D', 'OPTION D', '4'].includes(upper)) return options[3] || trimmed
+
+  return trimmed
+}
+
 // CSV bulk upload — no section assignment
 const wizardHandleCsvUpload = async (event) => {
   const file = event.target.files[0]
@@ -2319,38 +2487,59 @@ const wizardHandleCsvUpload = async (event) => {
   reader.onload = async (e) => {
     try {
       const text = e.target.result
-      const lines = text.split(/\r?\n/).filter(l => l.trim())
-      if (lines.length <= 1) return alert('CSV is empty.')
-      const rawHeaders = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, '').toLowerCase())
-      const colIdx = (kws) => rawHeaders.findIndex(h => kws.some(k => h.includes(k)))
-      const stmtIdx = colIdx(['statement', 'question'])
-      const typeIdx = colIdx(['type'])
-      const opt1Idx = colIdx(['opt1', 'option1', 'option_1'])
-      const opt2Idx = colIdx(['opt2', 'option2', 'option_2'])
-      const opt3Idx = colIdx(['opt3', 'option3', 'option_3'])
-      const opt4Idx = colIdx(['opt4', 'option4', 'option_4'])
-      const ansIdx = colIdx(['correct', 'answer', 'ans'])
-      const ptsIdx = colIdx(['points', 'marks', 'pts'])
-      const negIdx = colIdx(['negative', 'neg', 'penalty'])
-      const diffIdx = colIdx(['diff', 'difficulty', 'level'])
+      const rows = parseCsvText(text)
+      if (rows.length <= 1) return alert('CSV is empty or contains no data rows.')
+
+      const headers = rows[0]
+      const stmtIdx = findColumnIndex(headers, 'statement')
+      const typeIdx = findColumnIndex(headers, 'type')
+      const opt1Idx = findColumnIndex(headers, 'opt1')
+      const opt2Idx = findColumnIndex(headers, 'opt2')
+      const opt3Idx = findColumnIndex(headers, 'opt3')
+      const opt4Idx = findColumnIndex(headers, 'opt4')
+      const ansIdx = findColumnIndex(headers, 'correct')
+      const ptsIdx = findColumnIndex(headers, 'points')
+      const negIdx = findColumnIndex(headers, 'negative')
+      const diffIdx = findColumnIndex(headers, 'difficulty')
+      const topicIdx = findColumnIndex(headers, 'topic')
 
       const questions = []
-      for (let i = 1; i < lines.length; i++) {
-        const cols = lines[i].split(',').map(c => c.trim().replace(/^"|"$/g, ''))
+      for (let i = 1; i < rows.length; i++) {
+        const cols = rows[i]
         if (cols.length < 2) continue
-        const get = (idx, fallbackIdx) => idx >= 0 ? cols[idx] : (cols[fallbackIdx] || '')
-        const opts = [get(opt1Idx, 2), get(opt2Idx, 3), get(opt3Idx, 4), get(opt4Idx, 5)].filter(Boolean)
-        let type = (get(typeIdx, 1) || 'MCQ').toUpperCase()
-        if (!['MCQ','SINGLE_CHOICE','NUMERICAL','SUBJECTIVE','TRUE_FALSE'].includes(type)) type = 'MCQ'
-        let diff = (get(diffIdx, 9) || 'MEDIUM').toUpperCase()
-        if (!['EASY','MEDIUM','HARD'].includes(diff)) diff = 'MEDIUM'
+
+        const get = (idx, fallbackIdx) => (idx >= 0 && cols[idx] !== undefined ? cols[idx] : (fallbackIdx >= 0 && cols[fallbackIdx] !== undefined ? cols[fallbackIdx] : ''))
+
+        const statement = get(stmtIdx, 1) || get(-1, 0)
+        const opt1 = get(opt1Idx, 2)
+        const opt2 = get(opt2Idx, 3)
+        const opt3 = get(opt3Idx, 4)
+        const opt4 = get(opt4Idx, 5)
+        const rawType = get(typeIdx, -1)
+        const rawAns = get(ansIdx, 6)
+        const rawPts = get(ptsIdx, 7)
+        const rawNeg = get(negIdx, 8)
+        const rawDiff = get(diffIdx, 9)
+        const topic = get(topicIdx, -1)
+
+        const options = [opt1, opt2, opt3, opt4].filter(Boolean)
+        const correctAnswer = resolveCorrectAnswerKey(rawAns, options)
+
+        let cleanType = String(rawType || '').trim().toUpperCase()
+        if (!['MCQ', 'SINGLE_CHOICE', 'NUMERICAL', 'SUBJECTIVE', 'TRUE_FALSE'].includes(cleanType)) cleanType = 'MCQ'
+
+        let cleanDiff = String(rawDiff || '').trim().toUpperCase()
+        if (!['EASY', 'MEDIUM', 'HARD'].includes(cleanDiff)) cleanDiff = 'MEDIUM'
+
         questions.push({
-          statement: get(stmtIdx, 0) || 'Question',
-          type, options: opts.length ? opts : ['A','B','C','D'],
-          correctAnswer: get(ansIdx, 6) || (opts[0] || ''),
-          points: 1,
-          negativePoints: 0,
-          difficulty: diff,
+          statement: statement || 'Question Statement',
+          type: cleanType,
+          options: options.length ? options : ['A', 'B', 'C', 'D'],
+          correctAnswer,
+          points: Number(rawPts) || 1,
+          negativePoints: Number(rawNeg) || 0,
+          difficulty: cleanDiff,
+          topic: topic || undefined,
         })
       }
       if (!questions.length) return alert('No valid questions found.')
@@ -2391,25 +2580,59 @@ const wizardHandleSectionCsvUpload = async (event, sectionIdx) => {
   reader.onload = async (e) => {
     try {
       const text = e.target.result
-      const lines = text.split(/\r?\n/).filter(l => l.trim())
-      if (lines.length <= 1) return
-      const cols0 = (s) => s.split(',').map(c => c.trim().replace(/^"|"$/g, ''))
+      const rows = parseCsvText(text)
+      if (rows.length <= 1) return alert('CSV file is empty or contains only headers.')
+
+      const headers = rows[0]
+      const stmtIdx = findColumnIndex(headers, 'statement')
+      const typeIdx = findColumnIndex(headers, 'type')
+      const opt1Idx = findColumnIndex(headers, 'opt1')
+      const opt2Idx = findColumnIndex(headers, 'opt2')
+      const opt3Idx = findColumnIndex(headers, 'opt3')
+      const opt4Idx = findColumnIndex(headers, 'opt4')
+      const ansIdx = findColumnIndex(headers, 'correct')
+      const ptsIdx = findColumnIndex(headers, 'points')
+      const negIdx = findColumnIndex(headers, 'negative')
+      const diffIdx = findColumnIndex(headers, 'difficulty')
+      const topicIdx = findColumnIndex(headers, 'topic')
+
       const questions = []
-      for (let i = 1; i < lines.length; i++) {
-        const c = cols0(lines[i])
-        if (c.length < 2) continue
-        let type = (c[1] || 'MCQ').toUpperCase()
-        if (!['MCQ','SINGLE_CHOICE','NUMERICAL','SUBJECTIVE','TRUE_FALSE'].includes(type)) type = 'MCQ'
-        let diff = (c[9] || 'MEDIUM').toUpperCase()
-        if (!['EASY','MEDIUM','HARD'].includes(diff)) diff = 'MEDIUM'
-        const opts = [c[2],c[3],c[4],c[5]].filter(Boolean)
+      for (let i = 1; i < rows.length; i++) {
+        const cols = rows[i]
+        if (cols.length < 2) continue
+
+        const get = (idx, fallbackIdx) => (idx >= 0 && cols[idx] !== undefined ? cols[idx] : (fallbackIdx >= 0 && cols[fallbackIdx] !== undefined ? cols[fallbackIdx] : ''))
+
+        const statement = get(stmtIdx, 1) || get(-1, 0)
+        const opt1 = get(opt1Idx, 2)
+        const opt2 = get(opt2Idx, 3)
+        const opt3 = get(opt3Idx, 4)
+        const opt4 = get(opt4Idx, 5)
+        const rawType = get(typeIdx, -1)
+        const rawAns = get(ansIdx, 6)
+        const rawPts = get(ptsIdx, 7)
+        const rawNeg = get(negIdx, 8)
+        const rawDiff = get(diffIdx, 9)
+        const topic = get(topicIdx, -1)
+
+        const options = [opt1, opt2, opt3, opt4].filter(Boolean)
+        const correctAnswer = resolveCorrectAnswerKey(rawAns, options)
+
+        let cleanType = String(rawType || '').trim().toUpperCase()
+        if (!['MCQ', 'SINGLE_CHOICE', 'NUMERICAL', 'SUBJECTIVE', 'TRUE_FALSE'].includes(cleanType)) cleanType = 'MCQ'
+
+        let cleanDiff = String(rawDiff || '').trim().toUpperCase()
+        if (!['EASY', 'MEDIUM', 'HARD'].includes(cleanDiff)) cleanDiff = 'MEDIUM'
+
         questions.push({
-          statement: c[0] || 'Question', type,
-          options: opts.length ? opts : ['A','B','C','D'],
-          correctAnswer: c[6] || (opts[0] || ''),
-          points: 1,
-          negativePoints: 0,
-          difficulty: diff,
+          statement: statement || 'Question Statement',
+          type: cleanType,
+          options: options.length ? options : ['A', 'B', 'C', 'D'],
+          correctAnswer,
+          points: Number(rawPts) || 1,
+          negativePoints: Number(rawNeg) || 0,
+          difficulty: cleanDiff,
+          topic: topic || undefined,
           sectionId: sec._id,
         })
       }
@@ -2555,20 +2778,23 @@ const wizardGenerateSlots = async () => {
     cur.setMinutes(0, 0, 0, 0)
   }
   try {
+    const slotsToCreate = []
     while (cur.getTime() + durationMs <= end.getTime()) {
       const slotEnd = new Date(cur.getTime() + durationMs)
-      await slotService.createSlot(wizardExamId.value, {
+      slotsToCreate.push({
         startTime: cur.toISOString().slice(0, 16),
         endTime: slotEnd.toISOString().slice(0, 16),
         capacity: wSlotForm.value.capacity || 30,
       })
-      count++
       cur = slotEnd
     }
-    wizardSlotCount.value += count
-    if (count === 0) {
+
+    if (slotsToCreate.length === 0) {
       alert(`No complete ${wForm.value.durationMinutes || 60}-minute slots fit in that window. Try expanding your start/end window.`)
     } else {
+      const res = await slotService.bulkCreateSlots(wizardExamId.value, slotsToCreate)
+      count = res.count || slotsToCreate.length
+      wizardSlotCount.value += count
       alert(`⚡ Successfully auto-generated ${count} sequential slots of ${wForm.value.durationMinutes || 60} minutes each!`)
     }
   } catch (err) {
@@ -2578,12 +2804,39 @@ const wizardGenerateSlots = async () => {
   }
 }
 
+// Email Dispatch State inside Wizard
+const wizardSendEmails = ref(true)
+const dispatchingEmails = ref(false)
+
+const dispatchWizardEmails = async () => {
+  if (!wizardExamId.value) return
+  dispatchingEmails.value = true
+  try {
+    const res = await examService.notifyCandidates(wizardExamId.value)
+    alert(`📧 ${res.message || 'Invitation emails sent successfully!'}`)
+  } catch (err) {
+    alert(err.message || 'Failed to send emails.')
+  } finally {
+    dispatchingEmails.value = false
+  }
+}
+
 // Final step: set status and close wizard
 const wizardFinish = async (status) => {
   if (!wizardExamId.value) { showWizard.value = false; resetWizard(); return }
   wizardSaving.value = true
   try {
     await examService.updateExam(wizardExamId.value, { status })
+    if (wizardSendEmails.value && wizardStudentCount.value > 0) {
+      try {
+        const mailRes = await examService.notifyCandidates(wizardExamId.value)
+        alert(`⚡ Exam set to ${status}! 📧 ${mailRes.message || 'Invitation emails dispatched successfully!'}`)
+      } catch (mailErr) {
+        console.warn('Email dispatch notice:', mailErr.message)
+      }
+    } else {
+      alert(`⚡ Exam status updated to ${status}!`)
+    }
     showWizard.value = false
     resetWizard()
     await fetchExams()
@@ -2688,6 +2941,12 @@ const goLive = async (exam) => {
   if (!confirm(`▶ Go Live now with "${exam.title}"?\n\nThis will allow candidates to start the exam immediately.`)) return
   try {
     await examService.updateExam(exam.id, { status: 'LIVE' })
+    try {
+      const mailRes = await examService.notifyCandidates(exam.id)
+      alert(`▶ Exam "${exam.title}" is now LIVE! 📧 ${mailRes.message}`)
+    } catch (mailErr) {
+      alert(`▶ Exam "${exam.title}" is now LIVE!`)
+    }
     await fetchExams()
   } catch (err) {
     alert(err.message || 'Failed to go live.')
@@ -2953,78 +3212,74 @@ const handleSectionCsvUpload = (event, sectionId, sectionName) => {
   reader.onload = async (e) => {
     try {
       const text = e.target.result
-      const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0)
-      if (lines.length <= 1) return alert('CSV file is empty or contains only headers.')
+      const rows = parseCsvText(text)
+      if (rows.length <= 1) return alert('CSV file is empty or contains only headers.')
 
-      // Parse header row to find column indices dynamically
-      const rawHeaders = lines[0].split(',').map((h) => h.trim().replace(/^"|"$/g, '').toLowerCase())
-      const colIdx = (keywords) => rawHeaders.findIndex((h) => keywords.some((k) => h.includes(k)))
-      const stmtIdx = colIdx(['statement', 'question'])
-      const typeIdx = colIdx(['type'])
-      const opt1Idx = colIdx(['opt1', 'option1', 'option_1', 'a'])
-      const opt2Idx = colIdx(['opt2', 'option2', 'option_2', 'b'])
-      const opt3Idx = colIdx(['opt3', 'option3', 'option_3', 'c'])
-      const opt4Idx = colIdx(['opt4', 'option4', 'option_4', 'd'])
-      const ansIdx = colIdx(['correct', 'answer', 'ans'])
-      const ptsIdx = colIdx(['points', 'marks', 'pts'])
-      const negIdx = colIdx(['negative', 'neg', 'penalty'])
-      const diffIdx = colIdx(['diff', 'difficulty', 'level'])
+      const headers = rows[0]
+      const stmtIdx = findColumnIndex(headers, 'statement')
+      const typeIdx = findColumnIndex(headers, 'type')
+      const opt1Idx = findColumnIndex(headers, 'opt1')
+      const opt2Idx = findColumnIndex(headers, 'opt2')
+      const opt3Idx = findColumnIndex(headers, 'opt3')
+      const opt4Idx = findColumnIndex(headers, 'opt4')
+      const ansIdx = findColumnIndex(headers, 'correct')
+      const ptsIdx = findColumnIndex(headers, 'points')
+      const negIdx = findColumnIndex(headers, 'negative')
+      const diffIdx = findColumnIndex(headers, 'difficulty')
+      const topicIdx = findColumnIndex(headers, 'topic')
 
       const questions = []
-      for (let i = 1; i < lines.length; i++) {
-        const cols = lines[i].split(',').map((c) => c.trim().replace(/^"|"$/g, ''))
-        if (cols.length >= 2) {
-          // Fallback positional if headers not found
-          const statement = stmtIdx >= 0 ? cols[stmtIdx] : cols[0]
-          const rawType = typeIdx >= 0 ? cols[typeIdx] : cols[1]
-          const opt1 = opt1Idx >= 0 ? cols[opt1Idx] : cols[2]
-          const opt2 = opt2Idx >= 0 ? cols[opt2Idx] : cols[3]
-          const opt3 = opt3Idx >= 0 ? cols[opt3Idx] : cols[4]
-          const opt4 = opt4Idx >= 0 ? cols[opt4Idx] : cols[5]
-          const correctAns = ansIdx >= 0 ? cols[ansIdx] : cols[6]
-          const rawPts = ptsIdx >= 0 ? cols[ptsIdx] : cols[7]
-          const rawNeg = negIdx >= 0 ? cols[negIdx] : cols[8]
-          const rawDiff = diffIdx >= 0 ? cols[diffIdx] : cols[9]
+      for (let i = 1; i < rows.length; i++) {
+        const cols = rows[i]
+        if (cols.length < 2) continue
 
-          const options = [opt1, opt2, opt3, opt4].filter(Boolean)
+        const get = (idx, fallbackIdx) => (idx >= 0 && cols[idx] !== undefined ? cols[idx] : (fallbackIdx >= 0 && cols[fallbackIdx] !== undefined ? cols[fallbackIdx] : ''))
 
-          let cleanType = String(rawType || '').trim().toUpperCase()
-          if (!['MCQ', 'SINGLE_CHOICE', 'NUMERICAL', 'SUBJECTIVE', 'ESSAY', 'TRUE_FALSE'].includes(cleanType)) {
-            cleanType = 'MCQ'
-          }
+        const statement = get(stmtIdx, 1) || get(-1, 0)
+        const opt1 = get(opt1Idx, 2)
+        const opt2 = get(opt2Idx, 3)
+        const opt3 = get(opt3Idx, 4)
+        const opt4 = get(opt4Idx, 5)
+        const rawType = get(typeIdx, -1)
+        const rawAns = get(ansIdx, 6)
+        const rawPts = get(ptsIdx, 7)
+        const rawNeg = get(negIdx, 8)
+        const rawDiff = get(diffIdx, 9)
+        const topic = get(topicIdx, -1)
 
-          let cleanDiff = String(rawDiff || '').trim().toUpperCase()
-          if (!['EASY', 'MEDIUM', 'HARD'].includes(cleanDiff)) {
-            if (cleanDiff.startsWith('EA')) cleanDiff = 'EASY'
-            else if (cleanDiff.startsWith('HA')) cleanDiff = 'HARD'
-            else cleanDiff = 'MEDIUM'
-          }
+        const options = [opt1, opt2, opt3, opt4].filter(Boolean)
+        const correctAnswer = resolveCorrectAnswerKey(rawAns, options)
 
-          questions.push({
-            statement: statement || 'Question Statement',
-            type: cleanType,
-            options: options.length > 0 ? options : ['Option A', 'Option B', 'Option C', 'Option D'],
-            correctAnswer: correctAns || (options[0] || 'Option A'),
-            points: 1,
-            negativePoints: 0,
-            difficulty: cleanDiff,
-            sectionId: sectionId,
-          })
-        }
+        let cleanType = String(rawType || '').trim().toUpperCase()
+        if (!['MCQ', 'SINGLE_CHOICE', 'NUMERICAL', 'SUBJECTIVE', 'TRUE_FALSE'].includes(cleanType)) cleanType = 'MCQ'
+
+        let cleanDiff = String(rawDiff || '').trim().toUpperCase()
+        if (!['EASY', 'MEDIUM', 'HARD'].includes(cleanDiff)) cleanDiff = 'MEDIUM'
+
+        questions.push({
+          statement: statement || 'Question Statement',
+          type: cleanType,
+          options: options.length ? options : ['A', 'B', 'C', 'D'],
+          correctAnswer,
+          points: Number(rawPts) || 1,
+          negativePoints: Number(rawNeg) || 0,
+          difficulty: cleanDiff,
+          topic: topic || undefined,
+          sectionId: sectionId || null,
+        })
       }
 
-      if (questions.length === 0) return alert('No valid questions found in CSV.')
+      if (!questions.length) return alert('No valid questions found in CSV.')
 
       await questionService.bulkCreate(activeExam.value.id, questions, sectionId)
-      alert(`✅ Successfully uploaded ${questions.length} questions to "${sectionName}"!\n\nQuestions are now saved in the database and assigned to this section.`)
-      await fetchSections()
-      await fetchExamQuestions()
-      await fetchAssignedStudents()
+      alert(`✅ Successfully imported ${questions.length} questions into section "${sectionName || 'General'}"!`)
+      await fetchExamDetails(activeExam.value.id)
     } catch (err) {
-      alert(err.message || 'Failed to upload questions CSV to section.')
+      alert(err.message || 'Failed to upload CSV.')
     }
   }
   reader.readAsText(file)
+  event.target.value = ''
 }
 
 // Question Methods

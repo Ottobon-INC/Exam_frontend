@@ -29,6 +29,11 @@ export const examService = {
     request(`/exams/${id}`, {
       method: 'DELETE',
     }),
+  notifyCandidates: (id) =>
+    request(`/exams/${id}/notify-candidates`, {
+      method: 'POST',
+    }),
+  exportItemizedResultsUrl: (id) => `${import.meta.env.VITE_API_URL || 'http://localhost:4010/api'}/exams/${id}/export-itemized-results`,
   togglePublishResults: (examId, publish) =>
     request(`/results/${examId}/publish`, {
       method: 'POST',
@@ -149,6 +154,11 @@ export const slotService = {
     request(`/slots/exams/${examId}/slots`, {
       method: 'POST',
       body: JSON.stringify(data),
+    }),
+  bulkCreateSlots: (examId, slots) =>
+    request(`/slots/exams/${examId}/slots/bulk`, {
+      method: 'POST',
+      body: JSON.stringify({ slots }),
     }),
   deleteSlot: (examId, slotId) =>
     request(`/slots/exams/${examId}/slots/${slotId}`, {

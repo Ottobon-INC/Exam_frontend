@@ -1,5 +1,6 @@
 import { createApp } from 'vue'
 import './style.css'
+import './utils/toast.js'
 import App from './App.vue'
 import router from './router'
 import { FrappeUI } from 'frappe-ui'
