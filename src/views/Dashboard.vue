@@ -3,12 +3,10 @@
     <!-- Header -->
     <header class="flex min-h-14 items-center justify-between border-b border-zinc-200 bg-white px-4 sm:px-8">
       <div class="flex items-center gap-3">
-        <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-900 text-white font-bold text-sm">
-          EP
-        </div>
+        <img src="/logo.png" class="h-8 w-8 object-contain rounded-lg shadow-2xs" alt="Ottobon Emblem" />
         <div>
-          <span class="font-bold text-zinc-900 text-sm">ExamSuite Portal</span>
-          <span class="ml-2 text-3xs text-zinc-500 font-mono uppercase font-bold">Candidate</span>
+          <span class="font-bold text-zinc-900 text-sm">Ottobon Examination Portal</span>
+          <span class="ml-2 text-3xs text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded font-mono uppercase font-bold">Candidate</span>
         </div>
       </div>
       <div class="flex items-center gap-4">
@@ -87,7 +85,7 @@
                 </div>
                 <div class="flex justify-between">
                   <span class="text-zinc-500">Total Marks:</span>
-                  <span class="font-bold text-zinc-900">{{ exam.totalMarks }} (Pass: {{ exam.passMarks }})</span>
+                  <span class="font-bold text-zinc-900">{{ exam.totalMarks }} Marks</span>
                 </div>
 
                 <!-- Booked Slot Details if Available -->

@@ -102,6 +102,10 @@ export const questionService = {
 }
 
 export const attemptService = {
+  getActiveCandidates: (examId) => {
+    const query = examId && examId !== 'ALL' ? `?examId=${examId}` : ''
+    return request(`/attempts/live-active${query}`)
+  },
   startAttempt: (examId) =>
     request('/attempts/start', {
       method: 'POST',

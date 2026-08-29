@@ -181,8 +181,8 @@ const hasSections = computed(() => sectionBreakdown.value.length > 0)
             <div class="mt-1 text-lg font-bold text-ink-blue-3">{{ resultData.analytics?.maxScore }} pts</div>
           </div>
           <div class="rounded-xl border border-outline-gray-1 bg-surface-gray-1 p-3">
-            <span class="text-3xs text-ink-gray-4 uppercase font-medium">Pass Cutoff</span>
-            <div class="mt-1 text-lg font-bold text-ink-gray-9">{{ resultData.exam?.passMarks }} pts</div>
+            <span class="text-3xs text-ink-gray-4 uppercase font-medium">Total Candidates</span>
+            <div class="mt-1 text-lg font-bold text-ink-gray-9">{{ resultData.analytics?.totalTakers || 0 }}</div>
           </div>
           <div class="rounded-xl border border-outline-gray-1 bg-surface-gray-1 p-3">
             <span class="text-3xs text-ink-gray-4 uppercase font-medium">Pass Rate</span>

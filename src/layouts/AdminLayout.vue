@@ -8,18 +8,14 @@
       <!-- Logo & Brand Header -->
       <div class="flex h-14 items-center justify-between border-b border-outline-gray-1 px-4">
         <div v-if="!isSidebarCollapsed" class="flex items-center gap-2.5 overflow-hidden">
-          <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-600 text-white shadow-lg shadow-emerald-600/20 shadow-sm font-bold text-sm">
-            EP
-          </div>
+          <img src="/logo.png" class="h-8 w-8 object-contain rounded-lg shrink-0 shadow-2xs" alt="Ottobon Emblem" />
           <div class="flex flex-col leading-tight">
-            <span class="font-semibold text-zinc-900 text-sm truncate">ExamSuite Admin</span>
-            <span class="text-2xs text-zinc-400 font-mono uppercase tracking-wider">Enterprise</span>
+            <span class="font-semibold text-zinc-900 text-sm truncate">Ottobon Exam Portal</span>
+            <span class="text-3xs text-emerald-700 font-mono uppercase tracking-wider font-bold">Admin Portal</span>
           </div>
         </div>
         <div v-else class="mx-auto">
-          <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-600 text-white shadow-lg shadow-emerald-600/20 font-bold text-sm">
-            E
-          </div>
+          <img src="/logo.png" class="h-8 w-8 object-contain rounded-lg shrink-0" alt="Ottobon Emblem" />
         </div>
 
         <button

@@ -106,4 +106,9 @@ const router = createRouter({
   routes,
 })
 
+router.afterEach((to) => {
+  const pageTitle = to.meta?.title ? `${to.meta.title} • Ottobon Examination Portal` : 'Ottobon Examination Portal'
+  document.title = pageTitle
+})
+
 export default router

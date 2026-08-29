@@ -70,7 +70,7 @@
               >
                 {{ candidate.name ? candidate.name.split(' ').map(n=>n[0]).join('').slice(0,2) : 'CA' }}
               </div>
-              <span class="mt-1 text-3xs font-mono text-ink-gray-4">Connecting video...</span>
+              <span class="mt-1 text-3xs font-mono text-ink-gray-4">Awaiting 30s photo snapshot...</span>
             </div>
           </div>
 
@@ -213,7 +213,7 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
-import { examService } from '../../api/services'
+import { examService, attemptService } from '../../api/services'
 import { initProctorSocket } from '../../api/socket'
 
 const liveExams = ref([])
@@ -223,6 +223,35 @@ const selectedCandidate = ref(null)
 const loading = ref(true)
 
 let socket = null
+let pollInterval = null
+
+const fetchActiveCandidates = async () => {
+  try {
+    const res = await attemptService.getActiveCandidates(selectedExamId.value)
+    const activeList = res.activeCandidates || []
+    activeList.forEach((active) => {
+      const existing = candidates.value.find((c) => c.id === active.id)
+      if (!existing) {
+        candidates.value.push({
+          id: active.id,
+          examId: active.examId,
+          name: active.name,
+          rollNumber: active.rollNumber,
+          status: 'Active',
+          violations: active.violations || 0,
+          lastEvent: `Started ${active.examTitle || 'exam'}`,
+          auditLogs: [{ time: new Date(active.startedAt || Date.now()).toLocaleTimeString(), event: 'Exam started', isViolation: false }],
+        })
+      } else {
+        if (active.name) existing.name = active.name
+        if (active.rollNumber) existing.rollNumber = active.rollNumber
+        if (active.violations !== undefined) existing.violations = active.violations
+      }
+    })
+  } catch (err) {
+    console.warn('Active candidates fetch notice:', err)
+  }
+}
 
 const loadExams = async () => {
   loading.value = true
@@ -235,6 +264,7 @@ const loadExams = async () => {
     ]
     selectedExamId.value = 'ALL'
     connectProctorRoom('ALL')
+    await fetchActiveCandidates()
   } catch (err) {
     console.error('Failed to load exams:', err)
   } finally {
@@ -244,10 +274,18 @@ const loadExams = async () => {
 
 const connectProctorRoom = (examId) => {
   socket = initProctorSocket()
-  socket.emit('join_exam', {
-    examId,
-    role: 'PROCTOR',
-  })
+
+  const joinProctor = () => {
+    if (socket) {
+      socket.emit('join_exam', {
+        examId,
+        role: 'PROCTOR',
+      })
+    }
+  }
+
+  joinProctor()
+  socket.on('connect', () => joinProctor())
 
   // Remove existing listeners to avoid duplicate bindings
   socket.off('candidate_online')
@@ -346,6 +384,7 @@ const changeExamRoom = () => {
   candidates.value = []
   if (selectedExamId.value) {
     connectProctorRoom(selectedExamId.value)
+    fetchActiveCandidates()
   }
 }
 
@@ -372,11 +411,14 @@ const sendIntervention = (action) => {
 
 onMounted(() => {
   loadExams()
+  pollInterval = setInterval(fetchActiveCandidates, 10000)
 })
 
 onUnmounted(() => {
+  if (pollInterval) clearInterval(pollInterval)
   if (socket) {
     socket.off('candidate_online')
+    socket.off('proctor_frame_stream')
     socket.off('proctor_feed_update')
     socket.off('violation_alert')
   }

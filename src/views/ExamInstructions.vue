@@ -139,7 +139,7 @@ const beginExam = async () => {
           </div>
           <div>
             <span class="text-ink-gray-4 block">Maximum Score</span>
-            <span class="font-bold text-ink-gray-9 text-sm">{{ computedTotalMarks }} Marks (Pass: {{ exam.passMarks }})</span>
+            <span class="font-bold text-ink-gray-9 text-sm">{{ computedTotalMarks }} Marks</span>
           </div>
         </div>
         

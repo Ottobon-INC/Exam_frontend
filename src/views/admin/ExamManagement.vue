@@ -116,7 +116,7 @@
             </div>
             <div class="rounded-lg bg-zinc-50 border border-zinc-100 p-2">
               <div class="text-xs font-bold text-zinc-900">{{ exam.totalMarks }}<span class="text-3xs font-normal text-zinc-500"> pts</span></div>
-              <div class="text-3xs text-zinc-400 mt-0.5">Pass: {{ exam.passMarks }}</div>
+              <div class="text-3xs text-zinc-400 mt-0.5">Total Marks</div>
             </div>
             <div class="rounded-lg bg-zinc-50 border border-zinc-100 p-2">
               <div class="text-xs font-bold text-zinc-900">{{ exam._count?.attempts || 0 }}</div>
@@ -142,11 +142,6 @@
               <span @click.stop="openWizardForExam(exam, 4)" class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-3xs font-semibold cursor-pointer hover:opacity-80 transition-opacity"
                 :class="(exam._count?.students || 0) > 0 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'">
                 {{ (exam._count?.students || 0) > 0 ? '✅' : '⚠️' }} {{ exam._count?.students || 0 }} Students
-              </span>
-              <!-- Pass Cutoff -->
-              <span @click.stop="openWizardForExam(exam, 2)" class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-3xs font-semibold cursor-pointer hover:opacity-80 transition-opacity"
-                :class="(exam.passMarks || 0) > 0 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'">
-                {{ (exam.passMarks || 0) > 0 ? '✅' : '⚠️' }} Cutoff: {{ exam.passMarks || 'Not set' }}
               </span>
             </div>
           </div>

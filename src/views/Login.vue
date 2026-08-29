@@ -31,11 +31,11 @@ const handleLogin = async () => {
   <div class="flex min-h-screen items-center justify-center gradient-bg-2 p-6 text-zinc-900">
     <div class="w-full max-w-sm glass-card rounded-2xl p-8">
       <div class="mb-8 text-center">
-        <div class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-lg shadow-emerald-600/30 font-bold text-lg shadow-sm">
-          EP
+        <div class="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-xl overflow-hidden shadow-sm">
+          <img src="/logo.png" class="h-full w-full object-contain" alt="Ottobon Emblem" />
         </div>
-        <h1 class="text-xl font-semibold text-zinc-900">Candidate Portal</h1>
-        <p class="mt-1.5 text-xs text-zinc-500">Enter your registered credentials to access your exams.</p>
+        <h1 class="text-xl font-bold text-zinc-900">Ottobon Examination Portal</h1>
+        <p class="mt-1.5 text-xs text-zinc-500">Enter your registered credentials to access your assessment.</p>
       </div>
 
       <!-- Error Alert -->

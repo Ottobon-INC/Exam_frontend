@@ -261,13 +261,20 @@ onMounted(async () => {
     socket = initProctorSocket()
     const targetExamId = exam.value?.id || route.params.id
 
-    socket.emit('join_exam', {
-      examId: targetExamId,
-      role: 'CANDIDATE',
-      candidateId: user.value.id,
-      candidateName: user.value.name,
-      rollNumber: user.value.rollNumber,
-    })
+    const joinCandidateRoom = () => {
+      if (socket) {
+        socket.emit('join_exam', {
+          examId: targetExamId,
+          role: 'CANDIDATE',
+          candidateId: user.value.id,
+          candidateName: user.value.name,
+          rollNumber: user.value.rollNumber,
+        })
+      }
+    }
+
+    joinCandidateRoom()
+    socket.on('connect', () => joinCandidateRoom())
 
     const canvas = document.createElement('canvas')
     canvas.width = 640
@@ -387,9 +394,9 @@ onMounted(async () => {
     if (videoRef.value) {
       videoRef.value.onloadeddata = () => captureAndSendSnapshot()
     }
-    setTimeout(captureAndSendSnapshot, 1000)
-    setTimeout(captureAndSendSnapshot, 3000)
-    faceCheckInterval = setInterval(captureAndSendSnapshot, 2500)
+    setTimeout(captureAndSendSnapshot, 500)
+    setTimeout(captureAndSendSnapshot, 1500)
+    faceCheckInterval = setInterval(captureAndSendSnapshot, 30000)
 
     document.addEventListener('visibilitychange', handleVisibilityChange)
     document.addEventListener('fullscreenchange', handleFullScreenChange)

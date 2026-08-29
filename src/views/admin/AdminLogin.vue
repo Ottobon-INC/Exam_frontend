@@ -3,10 +3,10 @@
     <div class="w-full max-w-md glass-card-dark rounded-2xl p-8">
       <!-- Brand & Header -->
       <div class="mb-6 flex flex-col items-center text-center">
-        <div class="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-lg shadow-emerald-600/30 font-bold text-lg shadow-sm">
-          EP
+        <div class="mb-3 flex h-14 w-14 items-center justify-center rounded-xl overflow-hidden shadow-md">
+          <img src="/logo.png" class="h-full w-full object-contain" alt="Ottobon Emblem" />
         </div>
-        <h1 class="text-xl font-semibold text-white">Examiner & Admin Portal</h1>
+        <h1 class="text-xl font-bold text-white">Ottobon Exam Portal</h1>
         <p class="mt-1 text-xs text-zinc-400">
           {{ isRegistering ? 'Create a new examiner or admin account.' : 'Sign in to manage exams, question banks, and live proctoring.' }}
         </p>
