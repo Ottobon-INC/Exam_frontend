@@ -79,6 +79,22 @@ const globalQuestionNumber = computed(() => {
 
 const totalQuestions = computed(() => allQuestions.value.length)
 
+// ─── Tally Counters ─────────────────────────────────────────────────────────
+const answeredCount = computed(() => {
+  return allQuestions.value.filter((q) => {
+    const val = answers.value[q.id]
+    return val !== undefined && val !== null && String(val).trim() !== ''
+  }).length
+})
+
+const markedForReviewCount = computed(() => {
+  return allQuestions.value.filter((q) => markedForReview.value[q.id]).length
+})
+
+const unansweredCount = computed(() => {
+  return Math.max(0, totalQuestions.value - answeredCount.value)
+})
+
 // ─── Switch section tab ───────────────────────────────────────────────────────
 const requestFullScreen = async () => {
   try {
@@ -206,12 +222,18 @@ onMounted(async () => {
     unsectionedQuestions.value = res.exam.unsectionedQuestions || []
     timeLeft.value = (res.exam.durationMinutes || 60) * 60
 
-    // Restore saved answers
+    // Restore saved answers (from localStorage safety net and backend)
+    const localSaved = JSON.parse(localStorage.getItem(`exam_answers_${attemptId.value}`) || '{}')
+    const restored = { ...localSaved }
+
     if (res.savedAnswers) {
       res.savedAnswers.forEach((ans) => {
-        answers.value[ans.questionId] = ans.selectedOption ?? ans.textAnswer ?? null
+        if (ans.questionId) {
+          restored[ans.questionId] = ans.selectedOption ?? ans.textAnswer ?? restored[ans.questionId] ?? null
+        }
       })
     }
+    answers.value = restored
 
     // Timer
     timerInterval = setInterval(() => {
@@ -405,18 +427,29 @@ const handleVisibilityChange = async () => {
 }
 
 const handleAnswerChange = (qId, val) => {
-  answers.value[qId] = val
-  clearTimeout(autoSaveTimeout)
-  autoSaveTimeout = setTimeout(() => {
-    const q = allQuestions.value.find((item) => item.id === qId)
-    const isSubjective = q?.type === 'SUBJECTIVE'
-    attemptService.saveAnswer(
-      attemptId.value,
-      qId,
-      !isSubjective ? val : undefined,
-      isSubjective ? val : undefined,
-    )
-  }, 400)
+  if (!qId) return
+
+  // 1. Update Vue reactive state immediately
+  answers.value = { ...answers.value, [qId]: val }
+
+  // 2. Persist to localStorage synchronously as immediate safety net
+  if (attemptId.value) {
+    try {
+      localStorage.setItem(`exam_answers_${attemptId.value}`, JSON.stringify(answers.value))
+    } catch (e) {
+      console.warn('LocalStorage answer save warning:', e)
+    }
+  }
+
+  // 3. Fire API save immediately without debounce timeout risk
+  const q = allQuestions.value.find((item) => item.id === qId)
+  const isSubjective = q?.type === 'SUBJECTIVE'
+  attemptService.saveAnswer(
+    attemptId.value,
+    qId,
+    !isSubjective ? val : undefined,
+    isSubjective ? val : undefined,
+  ).catch(err => console.warn('Background save error notice:', err))
 }
 
 const formatTime = (seconds) => {
@@ -436,11 +469,30 @@ const markExamAsCompletedLocally = () => {
 
 const executeSubmit = async () => {
   try {
+    loading.value = true
+    // Flush ALL answers to backend to ensure last question selected answer is 100% saved before submission
+    const savePromises = Object.entries(answers.value).map(([qId, val]) => {
+      if (val !== undefined && val !== null && String(val).trim() !== '') {
+        const q = allQuestions.value.find((item) => item.id === qId)
+        const isSubjective = q?.type === 'SUBJECTIVE'
+        return attemptService.saveAnswer(
+          attemptId.value,
+          qId,
+          !isSubjective ? val : undefined,
+          isSubjective ? val : undefined,
+        ).catch(() => {})
+      }
+      return Promise.resolve()
+    })
+    await Promise.all(savePromises)
+
     await attemptService.submitAttempt(attemptId.value)
     markExamAsCompletedLocally()
     router.push(`/results/${route.params.id}`)
   } catch (err) {
     alert(err.message || 'Error submitting exam.')
+  } finally {
+    loading.value = false
   }
 }
 
@@ -660,11 +712,26 @@ const submitExam = async (isAuto = false) => {
             </button>
           </div>
 
-          <!-- Legend -->
-          <div class="mt-auto border-t border-outline-gray-1 pt-3 space-y-1.5 text-3xs text-ink-gray-6">
-            <div class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded bg-surface-green-2 border border-outline-green-2"></span><span>Answered</span></div>
-            <div class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded bg-surface-amber-1 border border-outline-amber-2"></span><span>Marked for Review</span></div>
-            <div class="flex items-center gap-2"><span class="h-2.5 w-2.5 rounded bg-surface-gray-1 border border-outline-gray-2"></span><span>Unanswered</span></div>
+          <!-- Live Answered / Unanswered / Review Tally Panel -->
+          <div class="mt-auto border-t border-outline-gray-1 pt-3 space-y-2">
+            <div class="flex items-center justify-between text-2xs font-bold text-ink-gray-9">
+              <span>Exam Overview</span>
+              <span class="rounded bg-surface-gray-2 px-1.5 py-0.5 text-3xs font-semibold text-ink-gray-7">{{ totalQuestions }} Total Qs</span>
+            </div>
+            <div class="grid grid-cols-3 gap-1.5 text-center text-3xs font-medium">
+              <div class="rounded-lg bg-surface-green-1 border border-outline-green-2 py-1.5 px-1 text-ink-green-3">
+                <div class="text-xs font-bold">{{ answeredCount }}</div>
+                <div>Answered</div>
+              </div>
+              <div class="rounded-lg bg-surface-amber-1 border border-outline-amber-2 py-1.5 px-1 text-ink-amber-3">
+                <div class="text-xs font-bold">{{ markedForReviewCount }}</div>
+                <div>Review</div>
+              </div>
+              <div class="rounded-lg bg-surface-gray-1 border border-outline-gray-2 py-1.5 px-1 text-ink-gray-7">
+                <div class="text-xs font-bold">{{ unansweredCount }}</div>
+                <div>Unanswered</div>
+              </div>
+            </div>
           </div>
         </aside>
       </div>

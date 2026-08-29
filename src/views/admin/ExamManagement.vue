@@ -1385,6 +1385,30 @@
                     </label>
                   </div>
                 </div>
+
+                <!-- Slot Booking Mode Toggle -->
+                <div class="rounded-xl border border-zinc-200 bg-zinc-50 p-5 space-y-3">
+                  <h4 class="text-xs font-bold text-zinc-900 flex items-center gap-2">📅 Candidate Slot Booking Mode</h4>
+                  <p class="text-3xs text-zinc-500">Control whether candidates must book a time slot before taking the assessment.</p>
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <label class="flex items-start gap-3 rounded-lg border p-3.5 cursor-pointer transition-colors"
+                      :class="wForm.slotBookingEnabled !== false ? 'border-indigo-600 bg-indigo-50/50' : 'border-zinc-200 bg-white hover:border-zinc-300'">
+                      <input type="radio" :value="true" v-model="wForm.slotBookingEnabled" class="mt-0.5 h-4 w-4 text-indigo-600 cursor-pointer" />
+                      <div>
+                        <div class="text-xs font-bold text-zinc-900">Enable Slot Selection (Recommended)</div>
+                        <div class="text-3xs text-zinc-500 mt-0.5">Candidates log in and choose a preferred Sunday time slot before starting.</div>
+                      </div>
+                    </label>
+                    <label class="flex items-start gap-3 rounded-lg border p-3.5 cursor-pointer transition-colors"
+                      :class="wForm.slotBookingEnabled === false ? 'border-amber-600 bg-amber-50/50' : 'border-zinc-200 bg-white hover:border-zinc-300'">
+                      <input type="radio" :value="false" v-model="wForm.slotBookingEnabled" class="mt-0.5 h-4 w-4 text-amber-600 cursor-pointer" />
+                      <div>
+                        <div class="text-xs font-bold text-zinc-900">Disable Slot Selection (Direct Access)</div>
+                        <div class="text-3xs text-zinc-500 mt-0.5">No slot booking required. Candidates access the assessment directly when live.</div>
+                      </div>
+                    </label>
+                  </div>
+                </div>
               </div>
 
               <!-- ── STEP 3: SECTIONS & QUESTIONS ── -->
@@ -1667,6 +1691,7 @@
                     <div>{{ wForm.tabSwitchDetection ? '✅ Tab Detection ON' : '○ Tab Detection OFF' }}</div>
                     <div>{{ wForm.shuffleQuestions ? '✅ Shuffled Questions' : '○ Fixed Question Order' }}</div>
                     <div>{{ wForm.showImmediateResults ? '✅ Instant Results' : '○ Results Hidden Until Published' }}</div>
+                    <div>{{ wForm.slotBookingEnabled !== false ? '📅 Slot Selection: ENABLED' : '⚡ Slot Selection: DISABLED (Direct Access)' }}</div>
                   </div>
                 </div>
 
@@ -1743,12 +1768,172 @@
       </div>
       </div>
     </Teleport>
+
+    <!-- ============================================================================= -->
+    <!-- ADMIN STANDARDS-COMPLIANT CSV PREVIEW & VALIDATION MODAL                      -->
+    <!-- ============================================================================= -->
+    <Teleport to="body">
+      <div v-if="showCsvPreviewModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4 backdrop-blur-xs">
+        <div class="w-full max-w-4xl max-h-[90vh] flex flex-col rounded-2xl border border-zinc-300 bg-white shadow-2xl overflow-hidden">
+          
+          <!-- Header -->
+          <div class="px-6 py-4 border-b border-zinc-200 bg-zinc-900 text-white flex items-center justify-between">
+            <div>
+              <h3 class="text-sm font-bold flex items-center gap-2">
+                <span>📄 CSV Question Bank Import Verification</span>
+                <span class="text-3xs font-mono bg-zinc-800 text-zinc-300 px-2 py-0.5 rounded border border-zinc-700">{{ csvPreviewFileName }}</span>
+              </h3>
+              <p class="text-3xs text-zinc-400 mt-0.5">Inspect parsed questions below to verify comma handling & option mapping before committing to database.</p>
+            </div>
+            <button @click="showCsvPreviewModal = false" class="text-zinc-400 hover:text-white cursor-pointer font-bold">✕</button>
+          </div>
+
+          <!-- Content Body -->
+          <div class="p-6 overflow-y-auto space-y-5">
+            
+            <!-- Validation Error Banner if any -->
+            <div v-if="csvPreviewErrors.length > 0" class="rounded-xl border border-red-200 bg-red-50 p-4 space-y-2">
+              <div class="flex items-center gap-2 text-xs font-bold text-red-900">
+                <span>⚠️ File Validation Issues Found ({{ csvPreviewErrors.length }} Errors)</span>
+              </div>
+              <p class="text-3xs text-red-700">The CSV parser encountered malformed rows. Please correct these rows before importing:</p>
+              <ul class="max-h-36 overflow-y-auto divide-y divide-red-100 rounded-lg bg-white border border-red-200 p-2.5 text-3xs font-mono text-red-800 space-y-1">
+                <li v-for="(err, idx) in csvPreviewErrors" :key="idx" class="py-1">
+                  ❌ {{ err }}
+                </li>
+              </ul>
+            </div>
+
+            <!-- Success Banner if valid -->
+            <div v-else class="rounded-xl border border-emerald-200 bg-emerald-50 p-4 flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div class="h-9 w-9 rounded-full bg-emerald-500 text-white font-bold flex items-center justify-center text-sm">✓</div>
+                <div>
+                  <h4 class="text-xs font-bold text-emerald-950">RFC 4180 Validation Passed!</h4>
+                  <p class="text-3xs text-emerald-800 mt-0.5">All {{ csvPreviewQuestions.length }} questions parsed cleanly with 4 options and verified answer keys.</p>
+                </div>
+              </div>
+              <span class="text-xs font-bold text-emerald-900 bg-emerald-100 border border-emerald-300 px-3 py-1 rounded-full">
+                {{ csvPreviewQuestions.length }} Ready
+              </span>
+            </div>
+
+            <!-- Live Preview Table (First 5 Questions) -->
+            <div v-if="csvPreviewQuestions.length > 0" class="space-y-3">
+              <div class="flex items-center justify-between">
+                <h4 class="text-xs font-bold text-zinc-900 uppercase tracking-wider">
+                  Live Preview (Showing First {{ Math.min(5, csvPreviewQuestions.length) }} of {{ csvPreviewQuestions.length }} Questions)
+                </h4>
+                <span class="text-3xs text-zinc-500">Check for statement commas & option mapping</span>
+              </div>
+
+              <div class="rounded-xl border border-zinc-200 overflow-hidden shadow-xs">
+                <table class="w-full text-left text-2xs border-collapse">
+                  <thead class="bg-zinc-100 border-b border-zinc-200 text-zinc-700 font-bold">
+                    <tr>
+                      <th class="p-3 w-10 text-center">#</th>
+                      <th class="p-3 w-1/3">Question Statement</th>
+                      <th class="p-3">Options (A, B, C, D)</th>
+                      <th class="p-3 w-28">Correct Answer</th>
+                      <th class="p-3 w-20 text-center">Meta</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-zinc-200 bg-white">
+                    <tr v-for="(q, idx) in csvPreviewQuestions.slice(0, 5)" :key="idx" class="hover:bg-zinc-50 transition-colors">
+                      <td class="p-3 text-center font-bold text-zinc-500 font-mono">{{ idx + 1 }}</td>
+                      <td class="p-3 text-zinc-900 font-semibold leading-relaxed">
+                        {{ q.statement }}
+                      </td>
+                      <td class="p-3">
+                        <div class="space-y-1">
+                          <div v-for="(opt, optIdx) in q.options" :key="optIdx" 
+                            class="text-3xs px-2 py-1 rounded border flex items-start gap-1.5"
+                            :class="String(opt).trim().toLowerCase() === String(q.correctAnswer).trim().toLowerCase() ? 'bg-emerald-50 border-emerald-300 text-emerald-950 font-bold' : 'bg-zinc-50 border-zinc-200 text-zinc-700'">
+                            <span class="font-bold shrink-0 font-mono">{{ String.fromCharCode(65 + optIdx) }}:</span>
+                            <span>{{ opt }}</span>
+                          </div>
+                        </div>
+                      </td>
+                      <td class="p-3">
+                        <span class="inline-block px-2.5 py-1 rounded-lg text-3xs font-bold bg-emerald-100 text-emerald-900 border border-emerald-300">
+                          {{ q.correctAnswer }}
+                        </span>
+                      </td>
+                      <td class="p-3 text-center font-mono text-3xs">
+                        <div>{{ q.points }} pt</div>
+                        <div class="text-zinc-500 uppercase font-bold">{{ q.difficulty }}</div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Modal Footer -->
+          <div class="px-6 py-4 border-t border-zinc-200 bg-zinc-50 flex items-center justify-between shrink-0">
+            <button @click="showCsvPreviewModal = false" class="rounded-xl border border-zinc-300 bg-white px-4 py-2 text-xs font-bold text-zinc-700 hover:bg-zinc-100 cursor-pointer">
+              Cancel
+            </button>
+            <button 
+              @click="confirmImportCsvQuestions"
+              :disabled="csvPreviewErrors.length > 0 || !csvPreviewQuestions.length || wizardSaving"
+              class="rounded-xl bg-emerald-600 px-6 py-2.5 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50 cursor-pointer transition-colors shadow-sm flex items-center gap-2"
+            >
+              <span v-if="wizardSaving">Importing...</span>
+              <span v-else>🚀 Confirm & Import {{ csvPreviewQuestions.length }} Questions</span>
+            </button>
+          </div>
+
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { examService, questionService, sectionService, slotService, attemptService } from '../../api/services'
+import { parseAndValidateQuestionsCsv } from '../../utils/csvParser'
+
+// CSV Question Staging & Validation Preview Modal State
+const showCsvPreviewModal = ref(false)
+const csvPreviewQuestions = ref([])
+const csvPreviewErrors = ref([])
+const csvPreviewTarget = ref({ examId: null, sectionId: null, sectionIdx: null })
+const csvPreviewFileName = ref('')
+const csvPreviewValid = ref(true)
+
+const openCsvPreview = (res, target = {}, fileName = 'uploaded_questions.csv') => {
+  csvPreviewQuestions.value = res.questions || []
+  csvPreviewErrors.value = res.errors || []
+  csvPreviewValid.value = res.valid
+  csvPreviewTarget.value = target
+  csvPreviewFileName.value = fileName
+  showCsvPreviewModal.value = true
+}
+
+const confirmImportCsvQuestions = async () => {
+  if (!csvPreviewQuestions.value.length || csvPreviewErrors.value.length > 0) return
+  wizardSaving.value = true
+  try {
+    const { examId, sectionId, sectionIdx } = csvPreviewTarget.value
+    const res = await questionService.bulkCreate(examId, csvPreviewQuestions.value, sectionId)
+    
+    if (sectionIdx !== undefined && sectionIdx !== null && wizardSections.value[sectionIdx]) {
+      wizardSections.value[sectionIdx].uploadedCount = (wizardSections.value[sectionIdx].uploadedCount || 0) + csvPreviewQuestions.value.length
+    }
+    wizardUploadedQuestions.value += csvPreviewQuestions.value.length
+
+    alert(`🎉 Successfully imported ${csvPreviewQuestions.value.length} questions into exam!`)
+    showCsvPreviewModal.value = false
+    csvPreviewQuestions.value = []
+  } catch (err) {
+    alert(err.message || 'Failed to bulk import questions.')
+  } finally {
+    wizardSaving.value = false
+  }
+}
 
 const exams = ref([])
 const loading = ref(false)
@@ -2052,6 +2237,7 @@ const wForm = ref({
   tabSwitchDetection: true,
   shuffleQuestions: true,
   showImmediateResults: false,
+  slotBookingEnabled: true,
 })
 
 const wSectionForm = ref({
@@ -2078,43 +2264,11 @@ const parseQuestionCsvFile = (file, sectionId = null) => {
     reader.onload = (e) => {
       try {
         const text = e.target.result
-        const lines = text.split(/\r?\n/).filter((l) => l.trim())
-        if (lines.length <= 1) return resolve([])
-        const rawHeaders = lines[0].split(',').map((h) => h.trim().replace(/^"|"$/g, '').toLowerCase())
-        const colIdx = (kws) => rawHeaders.findIndex((h) => kws.some((k) => h.includes(k)))
-        const stmtIdx = colIdx(['statement', 'question'])
-        const typeIdx = colIdx(['type'])
-        const opt1Idx = colIdx(['opt1', 'option1', 'option_1'])
-        const opt2Idx = colIdx(['opt2', 'option2', 'option_2'])
-        const opt3Idx = colIdx(['opt3', 'option3', 'option_3'])
-        const opt4Idx = colIdx(['opt4', 'option4', 'option_4'])
-        const ansIdx = colIdx(['correct', 'answer', 'ans'])
-        const ptsIdx = colIdx(['points', 'marks', 'pts'])
-        const negIdx = colIdx(['negative', 'neg', 'penalty'])
-        const diffIdx = colIdx(['diff', 'difficulty', 'level'])
-
-        const questions = []
-        for (let i = 1; i < lines.length; i++) {
-          const cols = lines[i].split(',').map((c) => c.trim().replace(/^"|"$/g, ''))
-          if (cols.length < 2) continue
-          const get = (idx, fallbackIdx) => (idx >= 0 ? cols[idx] : cols[fallbackIdx] || '')
-          const opts = [get(opt1Idx, 2), get(opt2Idx, 3), get(opt3Idx, 4), get(opt4Idx, 5)].filter(Boolean)
-          let type = (get(typeIdx, 1) || 'MCQ').toUpperCase()
-          if (!['MCQ', 'SINGLE_CHOICE', 'NUMERICAL', 'SUBJECTIVE', 'TRUE_FALSE'].includes(type)) type = 'MCQ'
-          let diff = (get(diffIdx, 9) || 'MEDIUM').toUpperCase()
-          if (!['EASY', 'MEDIUM', 'HARD'].includes(diff)) diff = 'MEDIUM'
-          questions.push({
-            statement: get(stmtIdx, 0) || 'Question',
-            type,
-            options: opts.length ? opts : ['A', 'B', 'C', 'D'],
-            correctAnswer: get(ansIdx, 6) || opts[0] || '',
-            points: 1,
-            negativePoints: 0,
-            difficulty: diff,
-            sectionId,
-          })
+        const res = parseAndValidateQuestionsCsv(text, file.name)
+        if (res.errors && res.errors.length > 0) {
+          console.warn('CSV parse notices:', res.errors)
         }
-        resolve(questions)
+        resolve((res.questions || []).map(q => ({ ...q, sectionId: sectionId || null })))
       } catch (err) {
         reject(err)
       }
@@ -2160,6 +2314,7 @@ const openWizardForExam = async (exam, targetStep = 1) => {
     tabSwitchDetection: exam.tabSwitchDetection ?? exam.tab_switch_detection ?? true,
     shuffleQuestions: exam.shuffleQuestions ?? exam.shuffle_questions ?? true,
     showImmediateResults: exam.showImmediateResults ?? exam.show_immediate_results ?? false,
+    slotBookingEnabled: exam.slotBookingEnabled ?? exam.slot_booking_enabled ?? true,
   }
 
   // Pre-fetch sections for this exam
@@ -2199,7 +2354,7 @@ const resetWizard = () => {
     title: '', code: '', subject: '', description: '',
     durationMinutes: 60, passingMarks: 40, enableSections: false,
     webcamRequired: true, tabSwitchDetection: true,
-    shuffleQuestions: true, showImmediateResults: false,
+    shuffleQuestions: true, showImmediateResults: false, slotBookingEnabled: true,
   }
   wSectionForm.value = { name: '', cutoffMarks: 0, maxQuestionsLimit: null, description: '' }
   wSlotForm.value = { windowStart: '', windowEnd: '', capacity: 30 }
@@ -2237,6 +2392,7 @@ const wizardNext = async () => {
           shuffleQuestions: wForm.value.shuffleQuestions,
           tabSwitchDetection: wForm.value.tabSwitchDetection,
           showImmediateResults: wForm.value.showImmediateResults,
+          slotBookingEnabled: wForm.value.slotBookingEnabled,
         })
         wizardExamId.value = (res.exam || res).id
       } catch (err) {
@@ -2259,6 +2415,7 @@ const wizardNext = async () => {
         tabSwitchDetection: wForm.value.tabSwitchDetection,
         shuffleQuestions: wForm.value.shuffleQuestions,
         showImmediateResults: wForm.value.showImmediateResults,
+        slotBookingEnabled: wForm.value.slotBookingEnabled,
       })
     } catch (err) {
       alert(err.message || 'Failed to save settings.')
@@ -2357,129 +2514,57 @@ const wizardAddSection = async () => {
   }
 }
 
-// RFC 4180 compliant CSV parser that respects quoted strings containing commas
-const parseCsvText = (text) => {
-  const rows = []
-  let currentRow = []
-  let field = ''
-  let inQuotes = false
+const downloadSampleCsvTemplate = () => {
+  const content = `index,statement,option_a,option_b,option_c,option_d,correct_answer,points,difficulty,topic
+1,"A legal-aid clinic wants to improve throughput, but only one change can be funded. Current stage capacities are Intake 108, Triage 90, Review 84, Verification 95. When the last available slot creates a trade-off, what is the bottleneck?","Verification 95 cases/hour","Review 84 cases/hour","Intake 108 cases/hour","Filing 60 cases/hour",B,1,MEDIUM,Logical Reasoning
+2,"After the most popular option fails a policy check, a repair service center must choose one recovery plan for job prioritization. The proposals are Plan A (upfront 120 units) and Plan B (upfront 160 units). Which option minimizes risk?","minor-disruption chance 10%","major-disruption chance 4%; Plan B: upfront 160 units","minor-disruption chance 30%","Plan A: upfront 120 units",A,1,HARD,Decision Making`
 
-  for (let i = 0; i < text.length; i++) {
-    const char = text[i]
-    const nextChar = text[i + 1]
+  const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' })
+  const link = document.createElement('a')
+  link.href = URL.createObjectURL(blob)
+  link.setAttribute('download', 'ottobon_standard_question_bank_template.csv')
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+}
 
-    if (inQuotes) {
-      if (char === '"') {
-        if (nextChar === '"') {
-          field += '"'
-          i++
-        } else {
-          inQuotes = false
-        }
-      } else {
-        field += char
-      }
-    } else {
-      if (char === '"') {
-        inQuotes = true
-      } else if (char === ',' || char === ';' || char === '\t') {
-        currentRow.push(field.trim())
-        field = ''
-      } else if (char === '\r') {
-        if (nextChar === '\n') i++
-        currentRow.push(field.trim())
-        if (currentRow.some((c) => c.length > 0)) rows.push(currentRow)
-        currentRow = []
-        field = ''
-      } else if (char === '\n') {
-        currentRow.push(field.trim())
-        if (currentRow.some((c) => c.length > 0)) rows.push(currentRow)
-        currentRow = []
-        field = ''
-      } else {
-        field += char
-      }
+const downloadSampleJsonTemplate = () => {
+  const sampleData = [
+    {
+      "statement": "A legal-aid clinic wants to improve throughput, but only one change can be funded. Current stage capacities are Intake 108, Triage 90, Review 84, Verification 95. When the last available slot creates a trade-off, what is the bottleneck?",
+      "option_a": "Verification 95 cases/hour",
+      "option_b": "Review 84 cases/hour",
+      "option_c": "Intake 108 cases/hour",
+      "option_d": "Filing 60 cases/hour",
+      "correct_answer": "B",
+      "points": 1,
+      "difficulty": "MEDIUM",
+      "topic": "Logical Reasoning"
+    },
+    {
+      "statement": "After the most popular option fails a policy check, a repair service center must choose one recovery plan for job prioritization. The proposals are Plan A (upfront 120 units) and Plan B (upfront 160 units). Which option minimizes risk?",
+      "option_a": "minor-disruption chance 10%",
+      "option_b": "major-disruption chance 4%; Plan B: upfront 160 units",
+      "option_c": "minor-disruption chance 30%",
+      "option_d": "Plan A: upfront 120 units",
+      "correct_answer": "A",
+      "points": 1,
+      "difficulty": "HARD",
+      "topic": "Decision Making"
     }
-  }
+  ]
 
-  if (field || currentRow.length > 0) {
-    currentRow.push(field.trim())
-    if (currentRow.some((c) => c.length > 0)) rows.push(currentRow)
-  }
-
-  return rows
+  const content = JSON.stringify(sampleData, null, 2)
+  const blob = new Blob([content], { type: 'application/json;charset=utf-8;' })
+  const link = document.createElement('a')
+  link.href = URL.createObjectURL(blob)
+  link.setAttribute('download', 'ottobon_standard_question_bank_template.json')
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
 }
 
-/**
- * Precise CSV header column index finder.
- * Correctly identifies option_a, option_b, option_c, option_d, statement, correct_answer, etc.
- * Avoids substring matching bugs (e.g. 'a' in 'statement').
- */
-const findColumnIndex = (headers, targetType) => {
-  const normHeaders = headers.map(h => String(h || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '_'))
-
-  if (targetType === 'statement') {
-    const idx = normHeaders.findIndex(h => h.includes('statement') || h.includes('question') || h === 'q' || h === 'stmt')
-    return idx >= 0 ? idx : (normHeaders[0] === 'index' || normHeaders[0] === 'id' ? 1 : 0)
-  }
-  if (targetType === 'opt1') {
-    const idx = normHeaders.findIndex(h => ['option_a', 'optiona', 'opt_a', 'opta', 'option_1', 'option1', 'opt_1', 'opt1', 'a', '1'].includes(h))
-    return idx >= 0 ? idx : 2
-  }
-  if (targetType === 'opt2') {
-    const idx = normHeaders.findIndex(h => ['option_b', 'optionb', 'opt_b', 'optb', 'option_2', 'option2', 'opt_2', 'opt2', 'b', '2'].includes(h))
-    return idx >= 0 ? idx : 3
-  }
-  if (targetType === 'opt3') {
-    const idx = normHeaders.findIndex(h => ['option_c', 'optionc', 'opt_c', 'optc', 'option_3', 'option3', 'opt_3', 'opt3', 'c', '3'].includes(h))
-    return idx >= 0 ? idx : 4
-  }
-  if (targetType === 'opt4') {
-    const idx = normHeaders.findIndex(h => ['option_d', 'optiond', 'opt_d', 'optd', 'option_4', 'option4', 'opt_4', 'opt4', 'd', '4'].includes(h))
-    return idx >= 0 ? idx : 5
-  }
-  if (targetType === 'type') {
-    return normHeaders.findIndex(h => h.includes('type') || h === 'kind')
-  }
-  if (targetType === 'correct') {
-    const idx = normHeaders.findIndex(h => h.includes('correct') || h.includes('answer') || h === 'ans' || h === 'key')
-    return idx >= 0 ? idx : 6
-  }
-  if (targetType === 'points') {
-    const idx = normHeaders.findIndex(h => h.includes('points') || h.includes('marks') || h === 'pts' || h === 'score')
-    return idx >= 0 ? idx : 7
-  }
-  if (targetType === 'negative') {
-    const idx = normHeaders.findIndex(h => h.includes('negative') || h.includes('neg') || h.includes('penalty'))
-    return idx >= 0 ? idx : 8
-  }
-  if (targetType === 'difficulty') {
-    const idx = normHeaders.findIndex(h => h.includes('diff') || h.includes('difficulty') || h.includes('level'))
-    return idx >= 0 ? idx : 9
-  }
-  if (targetType === 'topic') {
-    return normHeaders.findIndex(h => h.includes('topic') || h.includes('subject') || h.includes('category') || h.includes('tag'))
-  }
-  return -1
-}
-
-/**
- * Resolves letter keys ('A', 'B', 'C', 'D') or numeric keys ('1', '2', '3', '4') into actual option text.
- */
-const resolveCorrectAnswerKey = (rawAns, options) => {
-  if (!rawAns && rawAns !== 0) return options[0] || ''
-  const trimmed = String(rawAns).trim()
-  const upper = trimmed.toUpperCase()
-
-  if (['A', 'OPTION_A', 'OPTION A', '1'].includes(upper)) return options[0] || trimmed
-  if (['B', 'OPTION_B', 'OPTION B', '2'].includes(upper)) return options[1] || trimmed
-  if (['C', 'OPTION_C', 'OPTION C', '3'].includes(upper)) return options[2] || trimmed
-  if (['D', 'OPTION_D', 'OPTION D', '4'].includes(upper)) return options[3] || trimmed
-
-  return trimmed
-}
-
-// CSV bulk upload — no section assignment
+// CSV/JSON bulk upload — no section assignment
 const wizardHandleCsvUpload = async (event) => {
   const file = event.target.files[0]
   if (!file || !wizardExamId.value) return
@@ -2487,66 +2572,10 @@ const wizardHandleCsvUpload = async (event) => {
   reader.onload = async (e) => {
     try {
       const text = e.target.result
-      const rows = parseCsvText(text)
-      if (rows.length <= 1) return alert('CSV is empty or contains no data rows.')
-
-      const headers = rows[0]
-      const stmtIdx = findColumnIndex(headers, 'statement')
-      const typeIdx = findColumnIndex(headers, 'type')
-      const opt1Idx = findColumnIndex(headers, 'opt1')
-      const opt2Idx = findColumnIndex(headers, 'opt2')
-      const opt3Idx = findColumnIndex(headers, 'opt3')
-      const opt4Idx = findColumnIndex(headers, 'opt4')
-      const ansIdx = findColumnIndex(headers, 'correct')
-      const ptsIdx = findColumnIndex(headers, 'points')
-      const negIdx = findColumnIndex(headers, 'negative')
-      const diffIdx = findColumnIndex(headers, 'difficulty')
-      const topicIdx = findColumnIndex(headers, 'topic')
-
-      const questions = []
-      for (let i = 1; i < rows.length; i++) {
-        const cols = rows[i]
-        if (cols.length < 2) continue
-
-        const get = (idx, fallbackIdx) => (idx >= 0 && cols[idx] !== undefined ? cols[idx] : (fallbackIdx >= 0 && cols[fallbackIdx] !== undefined ? cols[fallbackIdx] : ''))
-
-        const statement = get(stmtIdx, 1) || get(-1, 0)
-        const opt1 = get(opt1Idx, 2)
-        const opt2 = get(opt2Idx, 3)
-        const opt3 = get(opt3Idx, 4)
-        const opt4 = get(opt4Idx, 5)
-        const rawType = get(typeIdx, -1)
-        const rawAns = get(ansIdx, 6)
-        const rawPts = get(ptsIdx, 7)
-        const rawNeg = get(negIdx, 8)
-        const rawDiff = get(diffIdx, 9)
-        const topic = get(topicIdx, -1)
-
-        const options = [opt1, opt2, opt3, opt4].filter(Boolean)
-        const correctAnswer = resolveCorrectAnswerKey(rawAns, options)
-
-        let cleanType = String(rawType || '').trim().toUpperCase()
-        if (!['MCQ', 'SINGLE_CHOICE', 'NUMERICAL', 'SUBJECTIVE', 'TRUE_FALSE'].includes(cleanType)) cleanType = 'MCQ'
-
-        let cleanDiff = String(rawDiff || '').trim().toUpperCase()
-        if (!['EASY', 'MEDIUM', 'HARD'].includes(cleanDiff)) cleanDiff = 'MEDIUM'
-
-        questions.push({
-          statement: statement || 'Question Statement',
-          type: cleanType,
-          options: options.length ? options : ['A', 'B', 'C', 'D'],
-          correctAnswer,
-          points: Number(rawPts) || 1,
-          negativePoints: Number(rawNeg) || 0,
-          difficulty: cleanDiff,
-          topic: topic || undefined,
-        })
-      }
-      if (!questions.length) return alert('No valid questions found.')
-      await questionService.bulkCreate(wizardExamId.value, questions, null)
-      wizardUploadedQuestions.value += questions.length
+      const result = parseAndValidateQuestionsCsv(text)
+      openCsvPreview(result, { examId: wizardExamId.value, sectionId: null }, file.name)
     } catch (err) {
-      alert(err.message || 'Failed to upload CSV.')
+      alert(err.message || 'Failed to parse CSV.')
     }
   }
   reader.readAsText(file)
@@ -2580,66 +2609,8 @@ const wizardHandleSectionCsvUpload = async (event, sectionIdx) => {
   reader.onload = async (e) => {
     try {
       const text = e.target.result
-      const rows = parseCsvText(text)
-      if (rows.length <= 1) return alert('CSV file is empty or contains only headers.')
-
-      const headers = rows[0]
-      const stmtIdx = findColumnIndex(headers, 'statement')
-      const typeIdx = findColumnIndex(headers, 'type')
-      const opt1Idx = findColumnIndex(headers, 'opt1')
-      const opt2Idx = findColumnIndex(headers, 'opt2')
-      const opt3Idx = findColumnIndex(headers, 'opt3')
-      const opt4Idx = findColumnIndex(headers, 'opt4')
-      const ansIdx = findColumnIndex(headers, 'correct')
-      const ptsIdx = findColumnIndex(headers, 'points')
-      const negIdx = findColumnIndex(headers, 'negative')
-      const diffIdx = findColumnIndex(headers, 'difficulty')
-      const topicIdx = findColumnIndex(headers, 'topic')
-
-      const questions = []
-      for (let i = 1; i < rows.length; i++) {
-        const cols = rows[i]
-        if (cols.length < 2) continue
-
-        const get = (idx, fallbackIdx) => (idx >= 0 && cols[idx] !== undefined ? cols[idx] : (fallbackIdx >= 0 && cols[fallbackIdx] !== undefined ? cols[fallbackIdx] : ''))
-
-        const statement = get(stmtIdx, 1) || get(-1, 0)
-        const opt1 = get(opt1Idx, 2)
-        const opt2 = get(opt2Idx, 3)
-        const opt3 = get(opt3Idx, 4)
-        const opt4 = get(opt4Idx, 5)
-        const rawType = get(typeIdx, -1)
-        const rawAns = get(ansIdx, 6)
-        const rawPts = get(ptsIdx, 7)
-        const rawNeg = get(negIdx, 8)
-        const rawDiff = get(diffIdx, 9)
-        const topic = get(topicIdx, -1)
-
-        const options = [opt1, opt2, opt3, opt4].filter(Boolean)
-        const correctAnswer = resolveCorrectAnswerKey(rawAns, options)
-
-        let cleanType = String(rawType || '').trim().toUpperCase()
-        if (!['MCQ', 'SINGLE_CHOICE', 'NUMERICAL', 'SUBJECTIVE', 'TRUE_FALSE'].includes(cleanType)) cleanType = 'MCQ'
-
-        let cleanDiff = String(rawDiff || '').trim().toUpperCase()
-        if (!['EASY', 'MEDIUM', 'HARD'].includes(cleanDiff)) cleanDiff = 'MEDIUM'
-
-        questions.push({
-          statement: statement || 'Question Statement',
-          type: cleanType,
-          options: options.length ? options : ['A', 'B', 'C', 'D'],
-          correctAnswer,
-          points: Number(rawPts) || 1,
-          negativePoints: Number(rawNeg) || 0,
-          difficulty: cleanDiff,
-          topic: topic || undefined,
-          sectionId: sec._id,
-        })
-      }
-      if (!questions.length) return
-      await questionService.bulkCreate(wizardExamId.value, questions, sec._id)
-      sec.uploadedCount = (sec.uploadedCount || 0) + questions.length
-      wizardUploadedQuestions.value += questions.length
+      const result = parseAndValidateQuestionsCsv(text)
+      openCsvPreview(result, { examId: wizardExamId.value, sectionId: sec._id, sectionIdx }, file.name)
     } catch (err) {
       alert(err.message || 'Section CSV upload failed.')
     }
@@ -3212,75 +3183,16 @@ const handleSectionCsvUpload = (event, sectionId, sectionName) => {
   reader.onload = async (e) => {
     try {
       const text = e.target.result
-      const rows = parseCsvText(text)
-      if (rows.length <= 1) return alert('CSV file is empty or contains only headers.')
-
-      const headers = rows[0]
-      const stmtIdx = findColumnIndex(headers, 'statement')
-      const typeIdx = findColumnIndex(headers, 'type')
-      const opt1Idx = findColumnIndex(headers, 'opt1')
-      const opt2Idx = findColumnIndex(headers, 'opt2')
-      const opt3Idx = findColumnIndex(headers, 'opt3')
-      const opt4Idx = findColumnIndex(headers, 'opt4')
-      const ansIdx = findColumnIndex(headers, 'correct')
-      const ptsIdx = findColumnIndex(headers, 'points')
-      const negIdx = findColumnIndex(headers, 'negative')
-      const diffIdx = findColumnIndex(headers, 'difficulty')
-      const topicIdx = findColumnIndex(headers, 'topic')
-
-      const questions = []
-      for (let i = 1; i < rows.length; i++) {
-        const cols = rows[i]
-        if (cols.length < 2) continue
-
-        const get = (idx, fallbackIdx) => (idx >= 0 && cols[idx] !== undefined ? cols[idx] : (fallbackIdx >= 0 && cols[fallbackIdx] !== undefined ? cols[fallbackIdx] : ''))
-
-        const statement = get(stmtIdx, 1) || get(-1, 0)
-        const opt1 = get(opt1Idx, 2)
-        const opt2 = get(opt2Idx, 3)
-        const opt3 = get(opt3Idx, 4)
-        const opt4 = get(opt4Idx, 5)
-        const rawType = get(typeIdx, -1)
-        const rawAns = get(ansIdx, 6)
-        const rawPts = get(ptsIdx, 7)
-        const rawNeg = get(negIdx, 8)
-        const rawDiff = get(diffIdx, 9)
-        const topic = get(topicIdx, -1)
-
-        const options = [opt1, opt2, opt3, opt4].filter(Boolean)
-        const correctAnswer = resolveCorrectAnswerKey(rawAns, options)
-
-        let cleanType = String(rawType || '').trim().toUpperCase()
-        if (!['MCQ', 'SINGLE_CHOICE', 'NUMERICAL', 'SUBJECTIVE', 'TRUE_FALSE'].includes(cleanType)) cleanType = 'MCQ'
-
-        let cleanDiff = String(rawDiff || '').trim().toUpperCase()
-        if (!['EASY', 'MEDIUM', 'HARD'].includes(cleanDiff)) cleanDiff = 'MEDIUM'
-
-        questions.push({
-          statement: statement || 'Question Statement',
-          type: cleanType,
-          options: options.length ? options : ['A', 'B', 'C', 'D'],
-          correctAnswer,
-          points: Number(rawPts) || 1,
-          negativePoints: Number(rawNeg) || 0,
-          difficulty: cleanDiff,
-          topic: topic || undefined,
-          sectionId: sectionId || null,
-        })
-      }
-
-      if (!questions.length) return alert('No valid questions found in CSV.')
-
-      await questionService.bulkCreate(activeExam.value.id, questions, sectionId)
-      alert(`✅ Successfully imported ${questions.length} questions into section "${sectionName || 'General'}"!`)
-      await fetchExamDetails(activeExam.value.id)
+      const result = parseAndValidateQuestionsCsv(text)
+      openCsvPreview(result, { examId: activeExam.value.id, sectionId }, file.name)
     } catch (err) {
-      alert(err.message || 'Failed to upload CSV.')
+      alert(err.message || 'Section CSV upload failed.')
     }
   }
   reader.readAsText(file)
   event.target.value = ''
 }
+
 
 // Question Methods
 const fetchExamQuestions = async () => {

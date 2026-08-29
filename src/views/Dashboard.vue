@@ -101,9 +101,21 @@
             </div>
             
             <div class="mt-5">
+              <!-- Case 0: Direct Access Mode (Slot booking disabled) -->
+              <button
+                v-if="exam.slotBookingEnabled === false"
+                @click="startExam(exam.id)"
+                :disabled="exam.status !== 'LIVE'"
+                class="w-full rounded-lg py-2.5 text-xs font-bold text-white transition-colors shadow-sm cursor-pointer"
+                :class="exam.status === 'LIVE' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-zinc-300 text-zinc-600 cursor-not-allowed'"
+              >
+                <span v-if="exam.status === 'LIVE'">🚀 Start Examination Now</span>
+                <span v-else>⏳ Waiting for Assessment to go LIVE</span>
+              </button>
+
               <!-- Case 1: No Slot Booked Yet -->
               <button
-                v-if="!exam.bookedSlot"
+                v-else-if="!exam.bookedSlot"
                 @click="openSlotBookingModal(exam)"
                 class="w-full rounded-lg bg-zinc-900 py-2.5 text-xs font-bold text-white hover:bg-zinc-800 transition-colors shadow-sm cursor-pointer"
               >
@@ -318,8 +330,10 @@ const confirmBookSlot = async (slotId) => {
 }
 
 const isSlotActive = (exam) => {
-  if (!exam || !exam.bookedSlot) return false
+  if (!exam) return false
   if (exam.status !== 'LIVE') return false
+  if (exam.slotBookingEnabled === false || exam.bookedSlot?.isDirectAccess) return true
+  if (!exam.bookedSlot) return false
   
   const now = new Date()
   const start = new Date(exam.bookedSlot.startTime)
@@ -342,6 +356,9 @@ const isSlotExpired = (slot) => {
 }
 
 const getExamStatusBadge = (exam) => {
+  if (exam.slotBookingEnabled === false || exam.bookedSlot?.isDirectAccess) {
+    return exam.status === 'LIVE' ? 'Direct Access Live' : 'Direct Access'
+  }
   if (!exam.bookedSlot) return 'Slot Pending'
   if (isSlotActive(exam)) return 'Slot Active'
   if (isSlotUpcoming(exam.bookedSlot)) return 'Slot Scheduled'
@@ -349,6 +366,9 @@ const getExamStatusBadge = (exam) => {
 }
 
 const getExamStatusClass = (exam) => {
+  if (exam.slotBookingEnabled === false || exam.bookedSlot?.isDirectAccess) {
+    return exam.status === 'LIVE' ? 'bg-emerald-100 text-emerald-800' : 'bg-zinc-100 text-zinc-700'
+  }
   if (!exam.bookedSlot) return 'bg-amber-100 text-amber-800'
   if (isSlotActive(exam)) return 'bg-emerald-100 text-emerald-800'
   if (isSlotUpcoming(exam.bookedSlot)) return 'bg-blue-100 text-blue-800'
