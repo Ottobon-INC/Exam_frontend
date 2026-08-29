@@ -1,4 +1,4 @@
-﻿<script setup>
+<script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Button } from 'frappe-ui'
@@ -32,7 +32,8 @@ onMounted(async () => {
 const overallPassed = computed(() => {
   const att = resultData.value?.candidateAttempt
   if (!att) return false
-  const scoreOk = att.totalScore >= (resultData.value?.exam?.passMarks || 0)
+  const passMarks = Number(resultData.value?.exam?.passMarks) || 0
+  const scoreOk = (Number(att.totalScore) || 0) >= passMarks
   const sectionalOk = att.sectionalPass !== false
   return scoreOk && sectionalOk
 })
