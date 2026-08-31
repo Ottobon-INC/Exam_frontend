@@ -29,9 +29,10 @@ export const examService = {
     request(`/exams/${id}`, {
       method: 'DELETE',
     }),
-  notifyCandidates: (id) =>
+  notifyCandidates: (id, payload = {}) =>
     request(`/exams/${id}/notify-candidates`, {
       method: 'POST',
+      body: JSON.stringify(payload),
     }),
   exportItemizedResultsUrl: (id) => `${import.meta.env.VITE_API_URL || 'http://localhost:4010/api'}/exams/${id}/export-itemized-results`,
   togglePublishResults: (examId, publish) =>

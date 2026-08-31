@@ -586,8 +586,79 @@
                   📥 Download CSV Template
                 </button>
               </div>
-              <div class="pt-2">
+              <div class="flex items-center gap-3 pt-2 flex-wrap">
                 <input type="file" accept=".csv" @change="handleStudentCsvSelected" class="text-xs text-zinc-800 font-medium cursor-pointer" />
+                <button
+                  @click="showModalManualStudentForm = !showModalManualStudentForm"
+                  class="rounded-lg px-4 py-2 text-xs font-extrabold cursor-pointer transition-all shadow-md flex items-center gap-1.5"
+                  style="background-color: #4f46e5 !important; color: #ffffff !important;"
+                >
+                  <span>✍</span>
+                  <span>{{ showModalManualStudentForm ? '✕ Close Form' : 'Enter Student Manually' }}</span>
+                </button>
+              </div>
+
+              <!-- Manual Student Entry Form in Modal -->
+              <div v-if="showModalManualStudentForm" class="mt-3 p-4 rounded-xl border border-indigo-200 bg-indigo-50/70 space-y-3 shadow-xs">
+                <div class="flex items-center justify-between">
+                  <h6 class="text-xs font-bold text-indigo-900 flex items-center gap-1.5">
+                    <span>👤 Enter Student Details Manually</span>
+                  </h6>
+                  <button @click="showModalManualStudentForm = false" class="text-xs font-bold text-zinc-400 hover:text-zinc-700 cursor-pointer">✕</button>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-3xs font-bold text-zinc-700 mb-1">Student Name <span class="text-red-500">*</span></label>
+                    <input
+                      v-model="modalManualStudent.name"
+                      type="text"
+                      placeholder="e.g. Rahul Sharma"
+                      class="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-xs text-zinc-900 focus:border-indigo-600 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label class="block text-3xs font-bold text-zinc-700 mb-1">Email Address <span class="text-red-500">*</span></label>
+                    <input
+                      v-model="modalManualStudent.email"
+                      type="email"
+                      placeholder="e.g. rahul.sharma@example.com"
+                      class="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-xs text-zinc-900 focus:border-indigo-600 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label class="block text-3xs font-bold text-zinc-700 mb-1">Roll / Phone Number (Optional)</label>
+                    <input
+                      v-model="modalManualStudent.rollNumber"
+                      type="text"
+                      placeholder="e.g. 9876543210 or STU-102"
+                      class="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-xs text-zinc-900 focus:border-indigo-600 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label class="block text-3xs font-bold text-zinc-700 mb-1">Temporary Password (Optional)</label>
+                    <input
+                      v-model="modalManualStudent.password"
+                      type="text"
+                      placeholder="Auto-generated if blank (e.g. Pass#4829)"
+                      class="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-xs text-zinc-900 focus:border-indigo-600 focus:outline-none"
+                    />
+                  </div>
+                </div>
+                <div class="flex items-center gap-2 pt-1">
+                  <button
+                    @click="addModalManualStudent"
+                    :disabled="!modalManualStudent.name || !modalManualStudent.email || savingStudents"
+                    class="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors cursor-pointer shadow-xs"
+                  >
+                    {{ savingStudents ? 'Adding...' : '✓ Add Student & Assign to Exam' }}
+                  </button>
+                  <button
+                    @click="showModalManualStudentForm = false"
+                    class="rounded-lg border border-zinc-300 bg-white px-3.5 py-2 text-xs font-bold text-zinc-700 hover:bg-zinc-100 cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -641,12 +712,37 @@
                 <h4 class="font-bold text-zinc-900 text-xs uppercase tracking-wider">
                   👥 Assigned Students Roster ({{ assignedStudents.length }})
                 </h4>
-                <div class="flex items-center gap-3">
-                  <button v-if="assignedStudents.length > 0" @click="exportAssignedStudentsRosterCsv" class="text-xs font-bold text-emerald-700 hover:text-emerald-900 underline cursor-pointer">
-                    📥 Download Roster CSV
+                <div class="flex items-center gap-2">
+                  <button
+                    v-if="selectedStudentIds.length > 0"
+                    @click="dispatchSelectedStudentEmails"
+                    :disabled="dispatchingEmails"
+                    class="rounded-lg bg-indigo-600 px-3.5 py-1 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-50 transition-all cursor-pointer shadow-sm animate-pulse"
+                  >
+                    {{ dispatchingEmails ? 'Sending...' : `⚡ Send Mail to Selected (${selectedStudentIds.length})` }}
                   </button>
-                  <button @click="fetchAssignedStudents" class="text-3xs font-bold text-zinc-500 hover:text-zinc-800 cursor-pointer">
-                    🔄 Refresh Roster
+                  <button
+                    v-if="assignedStudents.length > 0"
+                    @click="dispatchModalEmails(false)"
+                    :disabled="dispatchingEmails"
+                    class="rounded-lg bg-zinc-800 px-3 py-1 text-xs font-bold text-white hover:bg-zinc-900 disabled:opacity-50 transition-colors cursor-pointer shadow-xs"
+                  >
+                    {{ dispatchingEmails ? 'Sending...' : '📧 Send Pending Mails' }}
+                  </button>
+                  <button
+                    v-if="assignedStudents.length > 0"
+                    @click="dispatchModalEmails(true)"
+                    :disabled="dispatchingEmails"
+                    class="text-3xs font-bold text-indigo-700 hover:text-indigo-900 underline cursor-pointer"
+                    title="Force resend email invitations to all assigned students"
+                  >
+                    🔄 Force Resend
+                  </button>
+                  <button v-if="assignedStudents.length > 0" @click="exportAssignedStudentsRosterCsv" class="text-xs font-bold text-emerald-700 hover:text-emerald-900 underline cursor-pointer ml-1">
+                    📥 Roster CSV
+                  </button>
+                  <button @click="fetchAssignedStudents" class="text-3xs font-bold text-zinc-500 hover:text-zinc-800 cursor-pointer ml-1">
+                    🔄 Refresh
                   </button>
                 </div>
               </div>
@@ -663,16 +759,34 @@
                 <table class="w-full text-left text-xs text-zinc-800">
                   <thead class="bg-zinc-100 text-zinc-900 font-bold border-b border-zinc-200 sticky top-0">
                     <tr>
+                      <th class="p-2.5 w-10 text-center">
+                        <input
+                          type="checkbox"
+                          :checked="isAllStudentsSelected"
+                          @change="toggleSelectAllStudents"
+                          class="h-4 w-4 rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                          title="Select / Deselect All Students"
+                        />
+                      </th>
                       <th class="p-2.5">#</th>
                       <th class="p-2.5">Student Name</th>
                       <th class="p-2.5">Email</th>
                       <th class="p-2.5">Roll / Phone</th>
                       <th class="p-2.5">Slot Status</th>
+                      <th class="p-2.5">Mail Status</th>
                       <th class="p-2.5 text-right">Action</th>
                     </tr>
                   </thead>
                   <tbody class="divide-y divide-zinc-200">
                     <tr v-for="(student, idx) in assignedStudents" :key="student.candidateId" class="hover:bg-zinc-50 transition-colors">
+                      <td class="p-2.5 text-center">
+                        <input
+                          type="checkbox"
+                          :value="student.candidateId"
+                          v-model="selectedStudentIds"
+                          class="h-4 w-4 rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                        />
+                      </td>
                       <td class="p-2.5 font-bold text-zinc-500">{{ idx + 1 }}</td>
                       <td class="p-2.5 font-bold text-zinc-900">{{ student.name }}</td>
                       <td class="p-2.5 text-zinc-600">{{ student.email }}</td>
@@ -685,7 +799,23 @@
                           Pending Slot Choice
                         </span>
                       </td>
-                      <td class="p-2.5 text-right">
+                      <td class="p-2.5">
+                        <span v-if="student.emailSent" class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-3xs font-bold text-emerald-800" :title="student.emailSentAt ? `Sent at ${new Date(student.emailSentAt).toLocaleString()}` : 'Mail Sent'">
+                          ✅ Mail Sent
+                        </span>
+                        <span v-else class="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-0.5 text-3xs font-bold text-zinc-600">
+                          ⌛ Pending
+                        </span>
+                      </td>
+                      <td class="p-2.5 text-right space-x-2">
+                        <button
+                          @click="sendSingleStudentEmail(student)"
+                          :disabled="sendingSingleEmailId === student.candidateId"
+                          class="text-xs font-bold text-indigo-600 hover:text-indigo-800 cursor-pointer p-1"
+                          :title="student.emailSent ? 'Resend mail to this candidate' : 'Send mail to this candidate'"
+                        >
+                          {{ sendingSingleEmailId === student.candidateId ? 'Sending...' : (student.emailSent ? '📧 Resend' : '📧 Send Mail') }}
+                        </button>
                         <button
                           @click="removeStudentAssignment(student.candidateId)"
                           class="text-xs font-bold text-red-600 hover:text-red-800 cursor-pointer p-1"
@@ -1391,7 +1521,7 @@
                       <input type="radio" :value="true" v-model="wForm.slotBookingEnabled" class="mt-0.5 h-4 w-4 text-indigo-600 cursor-pointer" />
                       <div>
                         <div class="text-xs font-bold text-zinc-900">Enable Slot Selection (Recommended)</div>
-                        <div class="text-3xs text-zinc-500 mt-0.5">Candidates log in and choose a preferred Sunday time slot before starting.</div>
+                        <div class="text-3xs text-zinc-500 mt-0.5">Candidates log in and choose a preferred Monday time slot before starting.</div>
                       </div>
                     </label>
                     <label class="flex items-start gap-3 rounded-lg border p-3.5 cursor-pointer transition-colors"
@@ -1539,9 +1669,22 @@
 
                 <!-- Student Upload -->
                 <div class="rounded-xl border border-zinc-200 bg-zinc-50 p-5 space-y-3">
-                  <h5 class="text-xs font-bold text-zinc-900">📋 Assign Students via CSV</h5>
-                  <p class="text-3xs text-zinc-500">CSV format: name, email, phone, password (optional). Temporary passwords are generated automatically if left blank.</p>
-                  <div class="flex items-center gap-3 flex-wrap">
+                  <div class="flex items-center justify-between flex-wrap gap-2">
+                    <div>
+                      <h5 class="text-xs font-bold text-zinc-900">📋 Assign Students via CSV</h5>
+                      <p class="text-3xs text-zinc-500">CSV format: name, email, phone, password (optional). Temporary passwords are generated automatically if left blank.</p>
+                    </div>
+                    <button
+                      v-if="wizardStudentCount > 0"
+                      @click="fetchWizardAssignedStudents"
+                      class="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800 border border-emerald-300 hover:bg-emerald-200 cursor-pointer transition-colors shadow-2xs"
+                      title="Click to load/refresh assigned student list"
+                    >
+                      👥 {{ wizardStudentCount }} Student(s) Assigned (Click to View Roster)
+                    </button>
+                  </div>
+
+                  <div class="flex items-center gap-3 flex-wrap pt-1">
                     <label
                       class="rounded-lg px-4 py-2 text-xs font-bold text-white cursor-pointer shadow-xs transition-colors"
                       :class="wizardSavingStudents ? 'bg-zinc-600 cursor-not-allowed' : 'bg-zinc-900 hover:bg-zinc-800'"
@@ -1553,44 +1696,189 @@
                         </span>
                         Uploading...
                       </span>
-                      <span v-else>📤 Upload Roster</span>
+                      <span v-else>📤 Upload Roster CSV</span>
                       <input type="file" accept=".csv" class="hidden" @change="wizardHandleStudentCsv" :disabled="wizardSavingStudents" />
                     </label>
-                    <button @click="downloadStudentCsvTemplate()" class="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-xs font-bold text-zinc-700 hover:bg-zinc-100 cursor-pointer shadow-2xs" :disabled="wizardSavingStudents">⬇ Template</button>
                     <button
-                      v-if="wizardAssignedCredentials.length > 0"
+                      @click="showWizardManualStudentForm = !showWizardManualStudentForm"
+                      class="rounded-lg px-4 py-2 text-xs font-extrabold cursor-pointer transition-all shadow-md flex items-center gap-1.5"
+                      style="background-color: #4f46e5 !important; color: #ffffff !important;"
+                    >
+                      <span>✍</span>
+                      <span>{{ showWizardManualStudentForm ? '✕ Close Form' : 'Enter Student Manually' }}</span>
+                    </button>
+                    <button @click="downloadStudentCsvTemplate()" class="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-xs font-bold text-zinc-800 hover:bg-zinc-100 cursor-pointer shadow-2xs" :disabled="wizardSavingStudents">⬇ Template</button>
+                    <button
+                      v-if="wizardStudentCount > 0"
+                      @click="fetchWizardAssignedStudents"
+                      class="rounded-lg border border-indigo-400 bg-indigo-100 px-4 py-2 text-xs font-extrabold text-indigo-900 hover:bg-indigo-200 cursor-pointer transition-colors shadow-2xs"
+                    >
+                      👥 Show Student List ({{ wizardStudentCount }})
+                    </button>
+                    <button
+                      v-if="wizardAssignedStudents.length > 0 || wizardAssignedCredentials.length > 0"
                       @click="exportWizardCredentialsCsv"
                       class="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 cursor-pointer transition-colors shadow-xs"
                     >
-                      📥 Download Credentials CSV (With Passwords)
+                      📥 Download Roster CSV
                     </button>
-                    <span v-if="wizardStudentCount > 0" class="text-xs font-bold text-emerald-700">✅ {{ wizardStudentCount }} students assigned</span>
                   </div>
 
-                  <!-- Credentials Live Table Preview -->
-                  <div v-if="wizardAssignedCredentials.length > 0" class="mt-4 space-y-2 rounded-xl border border-emerald-200 bg-emerald-50/50 p-4">
+                  <!-- Manual Student Entry Form in Wizard -->
+                  <div v-if="showWizardManualStudentForm" class="mt-3 p-4 rounded-xl border border-indigo-200 bg-indigo-50/70 space-y-3 shadow-xs">
                     <div class="flex items-center justify-between">
-                      <span class="text-xs font-bold text-emerald-900">🔑 Generated Student Credentials ({{ wizardAssignedCredentials.length }} Candidates)</span>
-                      <button @click="exportWizardCredentialsCsv" class="text-xs font-bold text-emerald-700 hover:text-emerald-900 underline cursor-pointer">
-                        Export CSV →
+                      <h6 class="text-xs font-bold text-indigo-900 flex items-center gap-1.5">
+                        <span>👤 Enter Student Details Manually</span>
+                      </h6>
+                      <button @click="showWizardManualStudentForm = false" class="text-xs font-bold text-zinc-400 hover:text-zinc-700 cursor-pointer">✕</button>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label class="block text-3xs font-bold text-zinc-700 mb-1">Student Name <span class="text-red-500">*</span></label>
+                        <input
+                          v-model="wizardManualStudent.name"
+                          type="text"
+                          placeholder="e.g. Rahul Sharma"
+                          class="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-xs text-zinc-900 focus:border-indigo-600 focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label class="block text-3xs font-bold text-zinc-700 mb-1">Email Address <span class="text-red-500">*</span></label>
+                        <input
+                          v-model="wizardManualStudent.email"
+                          type="email"
+                          placeholder="e.g. rahul.sharma@example.com"
+                          class="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-xs text-zinc-900 focus:border-indigo-600 focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label class="block text-3xs font-bold text-zinc-700 mb-1">Roll / Phone Number (Optional)</label>
+                        <input
+                          v-model="wizardManualStudent.rollNumber"
+                          type="text"
+                          placeholder="e.g. 9876543210 or STU-102"
+                          class="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-xs text-zinc-900 focus:border-indigo-600 focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label class="block text-3xs font-bold text-zinc-700 mb-1">Temporary Password (Optional)</label>
+                        <input
+                          v-model="wizardManualStudent.password"
+                          type="text"
+                          placeholder="Auto-generated if blank (e.g. Pass#4829)"
+                          class="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-xs text-zinc-900 focus:border-indigo-600 focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                    <div class="flex items-center gap-2 pt-1">
+                      <button
+                        @click="addWizardManualStudent"
+                        :disabled="!wizardManualStudent.name || !wizardManualStudent.email || wizardSavingStudents"
+                        class="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors cursor-pointer shadow-xs"
+                      >
+                        {{ wizardSavingStudents ? 'Adding...' : '✓ Add Student & Assign to Exam' }}
+                      </button>
+                      <button
+                        @click="showWizardManualStudentForm = false"
+                        class="rounded-lg border border-zinc-300 bg-white px-3.5 py-2 text-xs font-bold text-zinc-700 hover:bg-zinc-100 cursor-pointer"
+                      >
+                        Cancel
                       </button>
                     </div>
-                    <div class="max-h-52 overflow-y-auto rounded-lg border border-zinc-200 bg-white">
+                  </div>
+
+                  <!-- Prompt button if student count > 0 but list not yet loaded into memory -->
+                  <div v-if="wizardStudentCount > 0 && wizardAssignedStudents.length === 0" class="mt-3 p-4 rounded-xl border border-indigo-200 bg-indigo-50/60 text-center space-y-2">
+                    <p class="text-xs font-bold text-indigo-900">👥 {{ wizardStudentCount }} student(s) are assigned to this exam.</p>
+                    <button
+                      @click="fetchWizardAssignedStudents"
+                      class="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-700 cursor-pointer shadow-xs transition-colors"
+                    >
+                      📋 Load & Show Assigned Student Roster
+                    </button>
+                  </div>
+
+                  <!-- Assigned Student Roster Table in Wizard with Checkboxes & Mail Status -->
+                  <div v-if="wizardAssignedStudents.length > 0" class="mt-4 space-y-2 rounded-xl border border-indigo-200 bg-indigo-50/40 p-4">
+                    <div class="flex items-center justify-between flex-wrap gap-2">
+                      <span class="text-xs font-bold text-indigo-900">👥 Assigned Student Roster ({{ wizardAssignedStudents.length }} Candidates)</span>
+                      <div class="flex items-center gap-2">
+                        <button
+                          v-if="wizardSelectedStudentIds.length > 0"
+                          @click="dispatchWizardSelectedStudentEmails"
+                          :disabled="dispatchingEmails"
+                          class="rounded-lg bg-indigo-600 px-3.5 py-1 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-50 transition-all cursor-pointer shadow-sm animate-pulse"
+                        >
+                          {{ dispatchingEmails ? 'Sending...' : `⚡ Send Mail to Selected (${wizardSelectedStudentIds.length})` }}
+                        </button>
+                        <button
+                          @click="dispatchWizardEmails(false)"
+                          :disabled="dispatchingEmails"
+                          class="rounded-lg bg-zinc-800 px-3 py-1 text-xs font-bold text-white hover:bg-zinc-900 disabled:opacity-50 transition-colors cursor-pointer shadow-xs"
+                        >
+                          {{ dispatchingEmails ? 'Sending...' : '📧 Send Pending Mails' }}
+                        </button>
+                        <button
+                          @click="exportWizardCredentialsCsv"
+                          class="text-xs font-bold text-emerald-700 hover:text-emerald-900 underline cursor-pointer"
+                        >
+                          📥 Export CSV
+                        </button>
+                      </div>
+                    </div>
+
+                    <div class="max-h-56 overflow-y-auto rounded-lg border border-zinc-200 bg-white">
                       <table class="w-full text-left text-xs">
-                        <thead class="bg-zinc-100 font-bold text-zinc-800 border-b border-zinc-200">
+                        <thead class="bg-zinc-100 font-bold text-zinc-800 border-b border-zinc-200 sticky top-0">
                           <tr>
+                            <th class="p-2.5 w-10 text-center">
+                              <input
+                                type="checkbox"
+                                :checked="isAllWizardStudentsSelected"
+                                @change="toggleSelectAllWizardStudents"
+                                class="h-4 w-4 rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                                title="Select / Deselect All Students"
+                              />
+                            </th>
+                            <th class="p-2.5">#</th>
                             <th class="p-2.5">Candidate Name</th>
                             <th class="p-2.5">Email ID</th>
-                            <th class="p-2.5">Roll Number</th>
-                            <th class="p-2.5 text-emerald-800">Generated Password</th>
+                            <th class="p-2.5">Roll / Phone</th>
+                            <th class="p-2.5">Mail Status</th>
+                            <th class="p-2.5 text-right">Action</th>
                           </tr>
                         </thead>
                         <tbody class="divide-y divide-zinc-100">
-                          <tr v-for="(c, idx) in wizardAssignedCredentials" :key="idx" class="hover:bg-zinc-50 transition-colors">
+                          <tr v-for="(c, idx) in wizardAssignedStudents" :key="c.candidateId || idx" class="hover:bg-zinc-50 transition-colors">
+                            <td class="p-2.5 text-center">
+                              <input
+                                type="checkbox"
+                                :value="c.candidateId"
+                                v-model="wizardSelectedStudentIds"
+                                class="h-4 w-4 rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                              />
+                            </td>
+                            <td class="p-2.5 font-bold text-zinc-500">{{ idx + 1 }}</td>
                             <td class="p-2.5 font-bold text-zinc-900">{{ c.name }}</td>
                             <td class="p-2.5 font-mono text-zinc-600 text-3xs">{{ c.email }}</td>
                             <td class="p-2.5 font-mono text-zinc-600 text-3xs">{{ c.rollNumber || c.roll_number || 'STU-AUTO' }}</td>
-                            <td class="p-2.5 font-mono font-bold text-emerald-800 text-xs select-all">{{ c.password }}</td>
+                            <td class="p-2.5">
+                              <span v-if="c.emailSent" class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-3xs font-bold text-emerald-800" :title="c.emailSentAt ? `Sent at ${new Date(c.emailSentAt).toLocaleString()}` : 'Mail Sent'">
+                                ✅ Mail Sent
+                              </span>
+                              <span v-else class="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-0.5 text-3xs font-bold text-zinc-600">
+                                ⌛ Pending
+                              </span>
+                            </td>
+                            <td class="p-2.5 text-right">
+                              <button
+                                @click="sendSingleWizardStudentEmail(c)"
+                                :disabled="sendingSingleEmailId === c.candidateId"
+                                class="text-xs font-bold text-indigo-600 hover:text-indigo-800 cursor-pointer p-1"
+                              >
+                                {{ sendingSingleEmailId === c.candidateId ? 'Sending...' : (c.emailSent ? '📧 Resend' : '📧 Send Mail') }}
+                              </button>
+                            </td>
                           </tr>
                         </tbody>
                       </table>
@@ -2037,6 +2325,7 @@ const fetchAssignedStudents = async () => {
   try {
     const res = await slotService.getAssignedStudents(activeExam.value.id)
     assignedStudents.value = res.students || []
+    selectedStudentIds.value = []
   } catch (err) {
     console.error('Failed to load assigned students:', err)
   } finally {
@@ -2332,6 +2621,13 @@ const openWizardForExam = async (exam, targetStep = 1) => {
     console.error('Failed to load sections for wizard:', err)
   }
 
+  // Pre-fetch assigned students for this exam
+  try {
+    await fetchWizardAssignedStudents()
+  } catch (err) {
+    console.error('Failed to load assigned students for wizard:', err)
+  }
+
   showWizard.value = true
 }
 
@@ -2449,6 +2745,9 @@ const wizardNext = async () => {
   }
 
   wizardStep.value++
+  if (wizardStep.value === 4 && wizardExamId.value) {
+    fetchWizardAssignedStudents()
+  }
 }
 
 const wizardPrev = () => {
@@ -2716,7 +3015,9 @@ const wizardHandleStudentCsv = async (event) => {
       wizardAssignedCredentials.value = [...wizardAssignedCredentials.value, ...newCredentials]
       wizardStudentCount.value = wizardAssignedCredentials.value.length
 
-      alert(`⚡ Successfully assigned ${students.length} students! Total assigned roster: ${wizardAssignedCredentials.value.length} candidates.`)
+      await fetchWizardAssignedStudents()
+
+      alert(`⚡ Successfully assigned ${students.length} students! Total assigned roster: ${wizardAssignedStudents.value.length} candidates.`)
     } catch (err) {
       alert(err.message || 'Failed to assign students.')
     } finally {
@@ -2725,6 +3026,80 @@ const wizardHandleStudentCsv = async (event) => {
   }
   reader.readAsText(file)
   event.target.value = ''
+}
+
+const showWizardManualStudentForm = ref(false)
+const wizardManualStudent = ref({
+  name: '',
+  email: '',
+  rollNumber: '',
+  password: '',
+})
+
+const addWizardManualStudent = async () => {
+  if (!wizardExamId.value) return
+  if (!wizardManualStudent.value.name.trim() || !wizardManualStudent.value.email.trim()) {
+    alert('Please enter both Student Name and Email Address.')
+    return
+  }
+
+  wizardSavingStudents.value = true
+  try {
+    const studentObj = {
+      name: wizardManualStudent.value.name.trim(),
+      email: wizardManualStudent.value.email.trim().toLowerCase(),
+      rollNumber: wizardManualStudent.value.rollNumber.trim() || `STU-${Math.floor(1000 + Math.random() * 9000)}`,
+      password: wizardManualStudent.value.password.trim() || `Pass#${Math.floor(1000 + Math.random() * 9000)}`,
+    }
+
+    await slotService.assignCandidates(wizardExamId.value, [studentObj])
+    alert(`✅ Successfully assigned "${studentObj.name}" (${studentObj.email}) to this exam!`)
+
+    wizardManualStudent.value = { name: '', email: '', rollNumber: '', password: '' }
+    showWizardManualStudentForm.value = false
+    await fetchWizardAssignedStudents()
+  } catch (err) {
+    alert(err.message || 'Failed to add student.')
+  } finally {
+    wizardSavingStudents.value = false
+  }
+}
+
+const showModalManualStudentForm = ref(false)
+const modalManualStudent = ref({
+  name: '',
+  email: '',
+  rollNumber: '',
+  password: '',
+})
+
+const addModalManualStudent = async () => {
+  if (!activeExam.value) return
+  if (!modalManualStudent.value.name.trim() || !modalManualStudent.value.email.trim()) {
+    alert('Please enter both Student Name and Email Address.')
+    return
+  }
+
+  savingStudents.value = true
+  try {
+    const studentObj = {
+      name: modalManualStudent.value.name.trim(),
+      email: modalManualStudent.value.email.trim().toLowerCase(),
+      rollNumber: modalManualStudent.value.rollNumber.trim() || `STU-${Math.floor(1000 + Math.random() * 9000)}`,
+      password: modalManualStudent.value.password.trim() || `Pass#${Math.floor(1000 + Math.random() * 9000)}`,
+    }
+
+    await slotService.assignCandidates(activeExam.value.id, [studentObj])
+    alert(`✅ Successfully assigned "${studentObj.name}" (${studentObj.email}) to this exam!`)
+
+    modalManualStudent.value = { name: '', email: '', rollNumber: '', password: '' }
+    showModalManualStudentForm.value = false
+    await fetchAssignedStudents()
+  } catch (err) {
+    alert(err.message || 'Failed to add student.')
+  } finally {
+    savingStudents.value = false
+  }
 }
 
 
@@ -2770,20 +3145,144 @@ const wizardGenerateSlots = async () => {
   }
 }
 
-// Email Dispatch State inside Wizard
+// Email Dispatch State inside Wizard & Modal
 const wizardSendEmails = ref(true)
 const dispatchingEmails = ref(false)
+const wizardAssignedStudents = ref([])
+const wizardSelectedStudentIds = ref([])
 
-const dispatchWizardEmails = async () => {
+const fetchWizardAssignedStudents = async () => {
+  if (!wizardExamId.value) return
+  try {
+    const res = await slotService.getAssignedStudents(wizardExamId.value)
+    wizardAssignedStudents.value = res.students || []
+    wizardStudentCount.value = wizardAssignedStudents.value.length
+    wizardSelectedStudentIds.value = []
+  } catch (err) {
+    console.error('Failed to load wizard assigned students:', err)
+  }
+}
+
+const isAllWizardStudentsSelected = computed(() => {
+  if (!wizardAssignedStudents.value || wizardAssignedStudents.value.length === 0) return false
+  return wizardAssignedStudents.value.every((s) => wizardSelectedStudentIds.value.includes(s.candidateId))
+})
+
+const toggleSelectAllWizardStudents = () => {
+  if (isAllWizardStudentsSelected.value) {
+    wizardSelectedStudentIds.value = []
+  } else {
+    wizardSelectedStudentIds.value = (wizardAssignedStudents.value || []).map((s) => s.candidateId)
+  }
+}
+
+const dispatchWizardSelectedStudentEmails = async () => {
+  if (!wizardExamId.value || wizardSelectedStudentIds.value.length === 0) return
+  dispatchingEmails.value = true
+  let count = 0
+  try {
+    for (const candId of wizardSelectedStudentIds.value) {
+      await examService.notifyCandidates(wizardExamId.value, { candidateId: candId })
+      count++
+    }
+    alert(`📧 Successfully sent invitation emails to ${count} selected student(s)!`)
+    wizardSelectedStudentIds.value = []
+    await fetchWizardAssignedStudents()
+  } catch (err) {
+    alert(err.message || 'Failed to dispatch emails to selected students.')
+  } finally {
+    dispatchingEmails.value = false
+  }
+}
+
+const sendSingleWizardStudentEmail = async (student) => {
+  if (!wizardExamId.value || !student?.candidateId) return
+  sendingSingleEmailId.value = student.candidateId
+  try {
+    await examService.notifyCandidates(wizardExamId.value, { candidateId: student.candidateId })
+    alert(`📧 Mail sent successfully to ${student.name} (${student.email})!`)
+    await fetchWizardAssignedStudents()
+  } catch (err) {
+    alert(err.message || 'Failed to send email.')
+  } finally {
+    sendingSingleEmailId.value = null
+  }
+}
+
+const dispatchWizardEmails = async (force = false) => {
   if (!wizardExamId.value) return
   dispatchingEmails.value = true
   try {
-    const res = await examService.notifyCandidates(wizardExamId.value)
+    const res = await examService.notifyCandidates(wizardExamId.value, { forceResend: force })
     alert(`📧 ${res.message || 'Invitation emails sent successfully!'}`)
+    await fetchWizardAssignedStudents()
   } catch (err) {
     alert(err.message || 'Failed to send emails.')
   } finally {
     dispatchingEmails.value = false
+  }
+}
+
+const dispatchModalEmails = async (force = false) => {
+  if (!activeExam.value) return
+  dispatchingEmails.value = true
+  try {
+    const res = await examService.notifyCandidates(activeExam.value.id, { forceResend: force })
+    alert(`📧 ${res.message || 'Invitation emails processed!'}`)
+    await fetchAssignedStudents()
+  } catch (err) {
+    alert(err.message || 'Failed to send emails.')
+  } finally {
+    dispatchingEmails.value = false
+  }
+}
+
+const sendingSingleEmailId = ref(null)
+const selectedStudentIds = ref([])
+
+const isAllStudentsSelected = computed(() => {
+  if (!assignedStudents.value || assignedStudents.value.length === 0) return false
+  return assignedStudents.value.every((s) => selectedStudentIds.value.includes(s.candidateId))
+})
+
+const toggleSelectAllStudents = () => {
+  if (isAllStudentsSelected.value) {
+    selectedStudentIds.value = []
+  } else {
+    selectedStudentIds.value = (assignedStudents.value || []).map((s) => s.candidateId)
+  }
+}
+
+const dispatchSelectedStudentEmails = async () => {
+  if (!activeExam.value || selectedStudentIds.value.length === 0) return
+  dispatchingEmails.value = true
+  let count = 0
+  try {
+    for (const candId of selectedStudentIds.value) {
+      await examService.notifyCandidates(activeExam.value.id, { candidateId: candId })
+      count++
+    }
+    alert(`📧 Successfully sent invitation emails to ${count} selected student(s)!`)
+    selectedStudentIds.value = []
+    await fetchAssignedStudents()
+  } catch (err) {
+    alert(err.message || 'Failed to dispatch emails to selected students.')
+  } finally {
+    dispatchingEmails.value = false
+  }
+}
+
+const sendSingleStudentEmail = async (student) => {
+  if (!activeExam.value || !student?.candidateId) return
+  sendingSingleEmailId.value = student.candidateId
+  try {
+    const res = await examService.notifyCandidates(activeExam.value.id, { candidateId: student.candidateId })
+    alert(`📧 Mail sent successfully to ${student.name} (${student.email})!`)
+    await fetchAssignedStudents()
+  } catch (err) {
+    alert(err.message || 'Failed to send email.')
+  } finally {
+    sendingSingleEmailId.value = null
   }
 }
 
